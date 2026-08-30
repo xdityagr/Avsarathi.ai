@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ===== Avsarathi.ai project-specific =====
+
+# SQLite database files
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Secrets (already covered by .env above, but be explicit)
+.env
+.env.local
+.env.production
