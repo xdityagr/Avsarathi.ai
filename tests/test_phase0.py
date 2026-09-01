@@ -124,29 +124,32 @@ class TestIdempotency:
 class TestGraphState:
     """Test the LangGraph conversation graph state machine."""
 
-    def test_consent_not_given_shows_notice(self):
+    @pytest.mark.asyncio
+    async def test_consent_not_given_shows_notice(self):
         """Without consent, should show the consent notice."""
         from src.graph import check_consent, CONSENT_NOTICE
 
         state = {"message": "hello", "consent_given": False, "message_count": 0, "response": ""}
-        result = check_consent(state)
+        result = await check_consent(state)
         assert result["consent_given"] is False
         assert result["response"] == CONSENT_NOTICE
 
-    def test_start_grants_consent(self):
+    @pytest.mark.asyncio
+    async def test_start_grants_consent(self):
         """Sending START should grant consent."""
         from src.graph import check_consent
 
         state = {"message": "START", "consent_given": False, "message_count": 0, "response": ""}
-        result = check_consent(state)
+        result = await check_consent(state)
         assert result["consent_given"] is True
 
-    def test_stop_revokes_consent(self):
+    @pytest.mark.asyncio
+    async def test_stop_revokes_consent(self):
         """Sending STOP should revoke consent and reset state."""
         from src.graph import check_consent, STOP_NOTICE
 
         state = {"message": "STOP", "consent_given": True, "message_count": 5, "response": ""}
-        result = check_consent(state)
+        result = await check_consent(state)
         assert result["consent_given"] is False
         assert result["message_count"] == 0
         assert result["response"] == STOP_NOTICE
@@ -170,11 +173,12 @@ class TestGraphState:
         result = process_message(state)
         assert "Message #5" in result["response"]
 
-    def test_start_case_insensitive(self):
+    @pytest.mark.asyncio
+    async def test_start_case_insensitive(self):
         """START should work regardless of case."""
         from src.graph import check_consent
 
         for msg in ["START", "start", "Start", "  START  "]:
             state = {"message": msg, "consent_given": False, "message_count": 0, "response": ""}
-            result = check_consent(state)
+            result = await check_consent(state)
             assert result["consent_given"] is True, f"Failed for: '{msg}'"

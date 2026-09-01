@@ -79,6 +79,17 @@ class Settings(BaseSettings):
         description="Send button messages when Content SIDs are configured. False = text-only mode.",
     )
 
+    # --- LLM Settings (Phase 3) ---
+    gemini_api_key: str = Field(default="", description="Gemini API Key")
+    gemini_model_extraction: str = Field(
+        default="gemini-2.5-flash-lite",
+        description="Model for Tier 2 extraction (higher free tier limit)"
+    )
+    gemini_model_generation: str = Field(
+        default="gemini-2.5-flash",
+        description="Model for generation on cache miss"
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

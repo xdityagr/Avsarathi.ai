@@ -16,9 +16,10 @@ def graph():
     return build_graph().compile()
 
 
-def test_button_payload_parsing_project_type(graph, settings):
+@pytest.mark.asyncio
+async def test_button_payload_parsing_project_type(graph, settings):
     # Test valid button payload for project type
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {
             "message": "some ignored text", 
             "button_payload": "project_type:business",
@@ -32,9 +33,10 @@ def test_button_payload_parsing_project_type(graph, settings):
     assert result["button_payload"] == ""
 
 
-def test_button_payload_parsing_gender(graph, settings):
+@pytest.mark.asyncio
+async def test_button_payload_parsing_gender(graph, settings):
     # Test valid button payload for gender
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {
             "message": "ignored",
             "button_payload": "gender:female",
@@ -51,9 +53,10 @@ def test_button_payload_parsing_gender(graph, settings):
     assert result["button_payload"] == ""
 
 
-def test_fallback_to_text_parsing_project_type(graph, settings):
+@pytest.mark.asyncio
+async def test_fallback_to_text_parsing_project_type(graph, settings):
     # Test fallback to text parsing when button payload is missing/invalid
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {
             "message": "I want to start a business", 
             "button_payload": "", 
@@ -66,7 +69,7 @@ def test_fallback_to_text_parsing_project_type(graph, settings):
     assert result["intake_step"] == "awaiting_cost"
     
     # Test invalid payload fallback
-    result = graph.invoke(
+    result = await graph.ainvoke(
         {
             "message": "I want to start a business", 
             "button_payload": "invalid:payload", 

@@ -4,10 +4,10 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
 ---
 
 ## Last updated
-2026-09-01, Phase 2 build + verification session (Gemini 3.1 Pro, Antigravity IDE).
+2026-09-01, Phase 3 build + verification session (Gemini 3.1 Pro, Antigravity IDE).
 
 ## Current phase
-**Phase 2 — COMPLETE.** Quick-reply buttons for categorical intake fields (project type, gender) implemented with a dual-mode text fallback. 66/66 tests passing.
+**Phase 3 — COMPLETE.** Gemini integration for LLM extraction and generation, coupled with robust SQLite caching based on deterministic outcome fingerprints. 72/72 tests passing.
 
 ## Done
 - Problem statement selected and locked: SIH26092 (NSFDC scheme matching), extending the existing GrantBot codebase rather than starting fresh.
@@ -41,13 +41,19 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
   - `src/worker.py` — integrated button routing based on `response_content_sid`.
   - `tests/test_buttons.py` — 4 tests verifying `ButtonPayload` parsing, text fallback, and response routing.
   - **Total: 66/66 tests passing.** No regression in text-only Sandbox fallback.
+- **Phase 3 — Gemini Integration & Caching:**
+  - `pyproject.toml` — added `langchain-google-genai>=4.0.0`.
+  - `src/cache.py` — SQLite LLM caching utilizing deterministic fingerprints (hashing scheme outcome fields rather than continuous inputs like exact income).
+  - `src/llm.py` — configured Gemini Flash-Lite for Tier 2 extraction (protecting free tier limits) and Gemini Flash for outcome generation using structured outputs.
+  - `src/graph.py` — integrated `await check_cache_for_outcome` and fallback to async LLM generation within `process_intake`. Transitioned state testing routines and nodes to fully async.
+  - `tests/test_llm.py`, `tests/test_cache.py`, and updated test suites (`test_phase0.py`, `test_buttons.py`) for async concurrency.
+  - **Total: 72/72 tests passing.** No regression.
 
 ## In progress
-Nothing — Phase 2 complete, ready for Phase 3.
+Nothing — Phase 3 complete, ready for Phase 4.
 
 ## Next up (in order)
-1. **Phase 3 — Gemini for Tier 2 extraction + generation**, caching from day one.
-2. **Phase 4 — Tier 3 partner locator + prudential routing**.
+1. **Phase 4 — Tier 3 partner locator + prudential routing**.
 
 ## Left / not started
 - Tier 3 (partner locator + prudential routing) with mocked utilization data.
@@ -62,6 +68,7 @@ Nothing — Phase 2 complete, ready for Phase 3.
 ## Session log
 *(Newest first)*
 
+- **2026-09-01 — Phase 3 build & verify.** Gemini 3.1 Pro, Antigravity IDE. Added Gemini generation and extraction capabilities using `langchain-google-genai`. Set up outcome-based caching in SQLite by hashing identical scheme match structures instead of continuous user input variables to improve hit rates. Adjusted graph flow and updated the testing suite to support async invocation across the LangGraph checkpointer. Resolved coroutine invocation limits and test lifecycles. 72/72 tests passing.
 - **2026-09-01 — Phase 2 build & verify.** Gemini 3.1 Pro, Antigravity IDE. Resumed cut-off session that half-implemented Phase 2. Wired up `src/worker.py` to correctly route between button and text messages based on the graph's `response_content_sid`. Wrote `test_buttons.py` and caught state initialization issue in LangGraph testing. Verified dual-mode fallback logic (buttons when possible, text for Sandbox/unsupported). 66/66 tests passing.
 - **2026-08-31 — Phase 1 build.** Claude Opus 4.6, Antigravity IDE. Built schemes.py (Tier 1 eligibility engine), calculator.py (EMI with 3 moratorium treatments), rewrote graph.py (intake flow). Removed unverified age fields from config.py. Created test_schemes.py (26 tests) and test_calculator.py (23 tests). Fixed calculator edge case (zero moratorium). Final: 62/62 tests passing, Phase 0 held.
 - **2026-08-30 — Phase 0 verification.** Claude Opus 4.6, Antigravity IDE. Ran full test suite: 13/13 passing. Phase 0 verified complete. Phase 1 implementation plan created. Planning docs saved to `docs/` directory.

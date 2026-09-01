@@ -35,6 +35,10 @@ from src.schemes import UserProfile, SchemeMatch, evaluate_eligible_schemes
 from src.calculator import calculate_emi, MoratoriumType
 from src.config import get_settings, SCHEMES
 
+from src.database import get_connection
+from src.llm import extract_project_type, generate_recommendation_template, format_recommendation
+from src.cache import generate_fingerprint, get_cached_template, set_cached_template
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,17 +47,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class ConversationState(TypedDict):
-    """State persisted by LangGraph's checkpointer between messages.
-
-    The checkpointer serializes this to SQLite automatically.
-    We never read/write a 'conversation_state' table manually.
-
-    Phase 1 additions: intake_step, project_type, project_cost,
-    annual_income, gender — all populated during the intake flow.
-
-    Phase 2 additions: button_payload (input from webhook),
-    response_content_sid (output — tells worker to send buttons).
-    """
+    """State persisted by LangGraph's checkpointer between messages."""
     message: str                     # Current inbound message text
     message_count: int               # Total messages from this user (state proof)
     response: str                    # Outbound response to send
@@ -117,11 +111,7 @@ PROMPT_GENDER = (
 # ---------------------------------------------------------------------------
 
 def _parse_button_payload(payload: str, expected_prefix: str) -> Optional[str]:
-    """Parse a structured ButtonPayload value.
-
-    Payloads use the format "prefix:value" (e.g., "project_type:business").
-    Returns the value if prefix matches, None otherwise.
-    """
+    """Parse a structured ButtonPayload value."""
     if not payload:
         return None
     payload = payload.strip()
@@ -134,10 +124,7 @@ def _parse_button_payload(payload: str, expected_prefix: str) -> Optional[str]:
 
 
 def _parse_project_type(text: str) -> Optional[str]:
-    """Parse project type from user text.
-
-    Returns "business" or "education", or None if ambiguous.
-    """
+    """Parse project type from user text."""
     text = text.strip().lower()
     # Direct matches
     if text in ("business", "biz", "b", "1"):
@@ -153,25 +140,17 @@ def _parse_project_type(text: str) -> Optional[str]:
 
 
 def _parse_currency(text: str) -> Optional[float]:
-    """Parse an Indian currency amount from user text.
-
-    Handles: plain numbers, Indian comma format (5,00,000),
-    lakh/lac/L suffix, crore/cr suffix, ₹ symbol.
-    Returns None if parsing fails.
-    """
+    """Parse an Indian currency amount from user text."""
     text = text.strip().replace("₹", "").replace(",", "").strip()
 
-    # number + lakh/lac/L
     match = re.match(r'^(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b', text, re.IGNORECASE)
     if match:
         return float(match.group(1)) * 100_000
 
-    # number + crore/cr
     match = re.match(r'^(\d+(?:\.\d+)?)\s*(?:crore|cr)\b', text, re.IGNORECASE)
     if match:
         return float(match.group(1)) * 10_000_000
 
-    # Plain number (possibly with decimals)
     match = re.match(r'^(\d+(?:\.\d+)?)\s*$', text)
     if match:
         return float(match.group(1))
@@ -180,10 +159,7 @@ def _parse_currency(text: str) -> Optional[float]:
 
 
 def _parse_gender(text: str) -> Optional[str]:
-    """Parse gender from user text.
-
-    Returns "male", "female", "other", or None if ambiguous.
-    """
+    """Parse gender from user text."""
     text = text.strip().lower()
     if text in ("male", "man", "m", "1", "purush"):
         return "male"
@@ -195,19 +171,11 @@ def _parse_gender(text: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# Graph nodes — Phase 0 (kept for backward compat) + Phase 1
+# Graph nodes
 # ---------------------------------------------------------------------------
 
-def check_consent(state: ConversationState) -> ConversationState:
-    """Check if user has given consent (replied START).
-
-    If not consented:
-      - If they just sent START → grant consent, proceed
-      - Otherwise → show consent notice, don't proceed
-    If already consented:
-      - If they send STOP → revoke consent, reset all state
-      - Otherwise → clear response and proceed to intake
-    """
+async def check_consent(state: ConversationState) -> ConversationState:
+    """Check if user has given consent (replied START)."""
     message = state.get("message", "").strip().upper()
     consent_given = state.get("consent_given", False)
 
@@ -219,7 +187,6 @@ def check_consent(state: ConversationState) -> ConversationState:
                 "message_count": 0,
                 "response": "",
                 "response_content_sid": "",
-                # Reset intake state on fresh start
                 "intake_step": "",
                 "project_type": "",
                 "project_cost": 0.0,
@@ -241,7 +208,6 @@ def check_consent(state: ConversationState) -> ConversationState:
                 "message_count": 0,
                 "response": STOP_NOTICE,
                 "response_content_sid": "",
-                # Clear intake state
                 "intake_step": "",
                 "project_type": "",
                 "project_cost": 0.0,
@@ -249,17 +215,14 @@ def check_consent(state: ConversationState) -> ConversationState:
                 "gender": "",
                 "button_payload": "",
             }
-        # Already consented — clear previous response so we proceed to intake
         return {**state, "response": "", "response_content_sid": ""}
 
 
-def route_after_consent(state: ConversationState) -> Literal["process_intake", "__end__"]:
-    """Route based on consent status: if we have a response already (consent
-    notice or stop notice), go to END. Otherwise proceed to process_intake."""
+async def route_after_consent(state: ConversationState) -> Literal["process_intake", "__end__"]:
+    """Route based on consent status."""
     if state.get("response"):
         return END
     return "process_intake"
-
 
 def process_message(state: ConversationState) -> ConversationState:
     """Process message with state proof.
@@ -285,28 +248,14 @@ def process_message(state: ConversationState) -> ConversationState:
         "response": response,
     }
 
-
-def process_intake(state: ConversationState) -> ConversationState:
-    """Handle the conversational intake flow for scheme matching.
-
-    Routes based on intake_step to collect data sequentially:
-    1. "" (empty/first time) → ask project type (buttons if enabled)
-    2. "awaiting_project_type" → parse ButtonPayload or text, ask cost
-    3. "awaiting_cost" → parse text, ask income
-    4. "awaiting_income" → parse text, ask gender (buttons if enabled)
-    5. "awaiting_gender" → parse ButtonPayload or text, run eligibility
-    6. "done" → offer to start a new search
-
-    Phase 2: tries ButtonPayload first for categorical fields,
-    falls back to text parsing. Always works in text-only mode too.
-    """
+async def process_intake(state: ConversationState) -> ConversationState:
+    """Handle the conversational intake flow for scheme matching."""
     message = state.get("message", "").strip()
     button_payload = state.get("button_payload", "")
     intake_step = state.get("intake_step", "")
     count = state.get("message_count", 0) + 1
     settings = get_settings()
 
-    # Handle "start over" / "new" / "reset" at any intake step
     if message.upper() in ("START OVER", "NEW", "RESET", "RESTART"):
         content_sid = settings.content_sid_project_type if settings.use_button_messages else ""
         return {
@@ -322,7 +271,7 @@ def process_intake(state: ConversationState) -> ConversationState:
             "response_content_sid": content_sid,
         }
 
-    # Step 1: First message after consent — ask project type
+    # Step 1
     if not intake_step:
         content_sid = settings.content_sid_project_type if settings.use_button_messages else ""
         return {
@@ -335,11 +284,14 @@ def process_intake(state: ConversationState) -> ConversationState:
         }
 
     # Step 2: Parse project type → ask cost
-    # Phase 2: try ButtonPayload first, then text
     if intake_step == "awaiting_project_type":
         project_type = _parse_button_payload(button_payload, "project_type")
         if project_type is None:
             project_type = _parse_project_type(message)
+        if project_type is None:
+            # Phase 3: LLM Extraction fallback
+            project_type = await extract_project_type(message)
+        
         if project_type is None:
             content_sid = settings.content_sid_project_type if settings.use_button_messages else ""
             return {
@@ -360,7 +312,7 @@ def process_intake(state: ConversationState) -> ConversationState:
             "intake_step": "awaiting_cost",
             "button_payload": "",
             "response": PROMPT_PROJECT_COST.format(type_label=type_label),
-            "response_content_sid": "",  # Cost is always text
+            "response_content_sid": "",
         }
 
     # Step 3: Parse project cost → ask income
@@ -383,7 +335,7 @@ def process_intake(state: ConversationState) -> ConversationState:
             "response": PROMPT_ANNUAL_INCOME,
         }
 
-    # Step 4: Parse income → ask gender (buttons if enabled)
+    # Step 4: Parse income → ask gender
     if intake_step == "awaiting_income":
         income = _parse_currency(message)
         if income is None or income < 0:
@@ -408,8 +360,7 @@ def process_intake(state: ConversationState) -> ConversationState:
             "button_payload": "",
         }
 
-    # Step 5: Parse gender → run eligibility + calculator → show results
-    # Phase 2: try ButtonPayload first, then text
+    # Step 5: Parse gender → run eligibility + format results
     if intake_step == "awaiting_gender":
         gender = _parse_button_payload(button_payload, "gender")
         if gender is None:
@@ -427,7 +378,6 @@ def process_intake(state: ConversationState) -> ConversationState:
                 "response_content_sid": content_sid,
             }
 
-        # Build profile and run Tier 1 eligibility
         profile = UserProfile(
             project_type=state.get("project_type", "business"),
             project_cost=state.get("project_cost", 0.0),
@@ -435,9 +385,26 @@ def process_intake(state: ConversationState) -> ConversationState:
             gender=gender,
         )
         matches = evaluate_eligible_schemes(profile)
-
-        # Format results
-        response = _format_results(profile, matches, gender)
+        language = "en"  # Future: read from state if multi-lingual
+        
+        fingerprint = generate_fingerprint(matches)
+        
+        db = await get_connection()
+        try:
+            template = await get_cached_template(db, fingerprint, language)
+            if not template:
+                template = await generate_recommendation_template(matches, language)
+                scheme_id = matches[0].scheme_id if matches else "NO_MATCH"
+                await set_cached_template(db, fingerprint, language, scheme_id, template)
+        finally:
+            await db.close()
+            
+        # Format results using the template and the user's specific math
+        response = format_recommendation(template, profile, matches)
+        
+        # Append EMI details if matches found (replicates Phase 1 formatting)
+        if matches:
+            response += "\n\n" + _format_emi_details(profile, matches, gender)
 
         return {
             **state,
@@ -449,7 +416,7 @@ def process_intake(state: ConversationState) -> ConversationState:
             "response_content_sid": "",
         }
 
-    # Step 6: After results — offer to start over
+    # Step 6
     if intake_step == "done":
         return {
             **state,
@@ -460,7 +427,6 @@ def process_intake(state: ConversationState) -> ConversationState:
             ),
         }
 
-    # Fallback — shouldn't reach here, but don't go silent
     logger.warning(f"Unknown intake_step: {intake_step}")
     return {
         **state,
@@ -473,29 +439,12 @@ def process_intake(state: ConversationState) -> ConversationState:
     }
 
 
-# ---------------------------------------------------------------------------
-# Result formatting — per phrases.md templates
-# ---------------------------------------------------------------------------
-
-def _format_results(profile: UserProfile, matches: list[SchemeMatch], gender: str) -> str:
-    """Format eligibility results with EMI estimates per phrases.md."""
+def _format_emi_details(profile: UserProfile, matches: list[SchemeMatch], gender: str) -> str:
+    """Format the EMI calculation block (Phase 1 logic)."""
     settings = get_settings()
-
-    if not matches:
-        # No-match path — per phrases.md §4, never go silent
-        return (
-            "Based on what you shared, I couldn't find an exact match "
-            "among the schemes I currently cover.\n\n"
-            "This doesn't necessarily mean you're not eligible for something else — "
-            "would you like me to share what I do cover?\n\n"
-            "Reply *START OVER* to try with different details, or *STOP* to end."
-        )
-
-    parts: list[str] = []
-    parts.append(f"✅ *{len(matches)} scheme{'s' if len(matches) > 1 else ''} matched!*\n")
-
+    parts = []
+    
     for i, match in enumerate(matches, 1):
-        # Calculate EMI using scheme's rate_min (most favorable to beneficiary)
         emi_result = calculate_emi(
             project_cost=profile.project_cost,
             financing_pct=match.financing_pct,
@@ -506,24 +455,10 @@ def _format_results(profile: UserProfile, matches: list[SchemeMatch], gender: st
             women_rebate_pct=match.women_rebate_pct,
             is_female=(gender == "female"),
         )
-
-        # Format scheme result
-        parts.append(f"*{i}. {match.name}*")
-
-        if match.max_project_cost is not None:
-            parts.append(f"For projects up to ₹{match.max_project_cost:,.0f}")
-        parts.append(
-            f"NSFDC can finance up to {int(match.financing_pct * 100)}% "
-            f"of your ₹{profile.project_cost:,.0f} project."
-        )
-
-        # Rate info
-        rate_str = f"{emi_result.rate_annual}%"
-        if match.rate_min != match.rate_max:
-            rate_str += f" (range: {match.rate_min}–{match.rate_max}%)"
-        parts.append(f"Estimated rate: {rate_str} per year")
-
-        # EMI info
+        
+        if len(matches) > 1:
+            parts.append(f"*{i}. {match.name}*")
+            
         parts.append(
             f"📊 Loan amount: ₹{emi_result.loan_amount:,.0f}\n"
             f"EMI after {emi_result.moratorium_months}-month grace period: "
@@ -537,13 +472,12 @@ def _format_results(profile: UserProfile, matches: list[SchemeMatch], gender: st
             f"Total repayment: ₹{emi_result.total_payable:,.0f} "
             f"over {emi_result.repayment_months} months"
         )
-        parts.append("")  # Blank line between schemes
-
+        parts.append("")  
+        
     parts.append(
         "*(These are estimates — final terms are set by your Channel Partner.)*\n\n"
         "Reply *START OVER* to try with different details, or *STOP* to end."
     )
-
     return "\n".join(parts)
 
 
@@ -552,21 +486,14 @@ def _format_results(profile: UserProfile, matches: list[SchemeMatch], gender: st
 # ---------------------------------------------------------------------------
 
 def build_graph() -> StateGraph:
-    """Build and compile the LangGraph conversation graph.
-
-    Returns an uncompiled graph — the caller (worker.py) compiles it
-    with the checkpointer attached.
-    """
+    """Build and compile the LangGraph conversation graph."""
     graph = StateGraph(ConversationState)
 
-    # Add nodes
     graph.add_node("check_consent", check_consent)
     graph.add_node("process_intake", process_intake)
 
-    # Set entry point
     graph.set_entry_point("check_consent")
 
-    # Conditional edge: after consent check, either show notice or proceed
     graph.add_conditional_edges(
         "check_consent",
         route_after_consent,
@@ -576,7 +503,6 @@ def build_graph() -> StateGraph:
         },
     )
 
-    # process_intake always ends the turn
     graph.add_edge("process_intake", END)
-
     return graph
+
