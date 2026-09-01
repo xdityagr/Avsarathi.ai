@@ -125,7 +125,10 @@ def calculate_emi(
 
     if moratorium_type == MoratoriumType.SIMPLE_INTEREST:
         # Borrower pays interest-only during moratorium; principal unchanged
-        moratorium_payment = principal * monthly_rate if monthly_rate > 0 else 0.0
+        if moratorium_months > 0:
+            moratorium_payment = principal * monthly_rate if monthly_rate > 0 else 0.0
+        else:
+            moratorium_payment = 0.0
         emi_principal = principal
         emi = _reducing_balance_emi(emi_principal, monthly_rate, repayment_months)
         total_moratorium = moratorium_payment * moratorium_months
