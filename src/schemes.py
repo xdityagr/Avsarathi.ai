@@ -145,9 +145,11 @@ def evaluate_eligible_schemes(profile: UserProfile) -> list[SchemeMatch]:
             why_parts.append("No project cost ceiling for this scheme")
 
         women_rebate = scheme.get("women_rebate_pct", 0.0)
-        if women_rebate > 0 and profile.gender == "female":
+        applied_rebate = women_rebate if profile.gender == "female" else 0.0
+        
+        if applied_rebate > 0:
             why_parts.append(
-                f"Women's rebate of {women_rebate}% on interest rate applies"
+                f"Women's rebate of {applied_rebate}% on interest rate applies"
             )
 
         match = SchemeMatch(
@@ -158,7 +160,7 @@ def evaluate_eligible_schemes(profile: UserProfile) -> list[SchemeMatch]:
             rate_max=scheme["rate_max"],
             max_project_cost=max_cost,
             financing_pct=scheme["financing_pct"],
-            women_rebate_pct=women_rebate,
+            women_rebate_pct=applied_rebate,
         )
         matches.append(match)
 

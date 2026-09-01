@@ -33,6 +33,9 @@ def generate_fingerprint(matches: list[SchemeMatch]) -> str:
         parts = []
         for match in matches:
             parts.append(f"{match.scheme_id}_{match.women_rebate_pct}")
+        
+        # Sort to prevent cache fragmenting purely on match order
+        parts.sort()
         data = "|".join(parts)
         
     return hashlib.sha256(data.encode("utf-8")).hexdigest()
