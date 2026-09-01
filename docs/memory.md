@@ -4,10 +4,10 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
 ---
 
 ## Last updated
-2026-08-31, Phase 1 build + verification session (Claude Opus 4.6, Antigravity IDE).
+2026-09-01, Phase 2 build + verification session (Gemini 3.1 Pro, Antigravity IDE).
 
 ## Current phase
-**Phase 1 — COMPLETE.** Tier 1 Rules Engine, EMI Calculator, and Intake Flow all built and verified. 62/62 tests passing.
+**Phase 2 — COMPLETE.** Quick-reply buttons for categorical intake fields (project type, gender) implemented with a dual-mode text fallback. 66/66 tests passing.
 
 ## Done
 - Problem statement selected and locked: SIH26092 (NSFDC scheme matching), extending the existing GrantBot codebase rather than starting fresh.
@@ -34,14 +34,20 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
   - `tests/test_schemes.py` — 26 boundary-value eligibility tests (income at exactly ₹5L, cost at ceilings, project type routing, category check, women's rebate)
   - `tests/test_calculator.py` — 23 tests (3 moratorium types, women's rebate, edge cases, financial invariants)
   - **Total: 62/62 tests passing.** Phase 0 did not regress.
+- **Phase 2 — WhatsApp Flow for structured intake:**
+  - `src/config.py` & `.env.example` — added `content_sid_project_type`, `content_sid_gender`, and `use_button_messages` toggle.
+  - `src/whatsapp.py` — added `send_whatsapp_buttons()` using Twilio Content API with graceful fallback to plain text.
+  - `src/graph.py` — modified state schema (`button_payload`, `response_content_sid`). Intake steps try `ButtonPayload` first, then text parser fallback.
+  - `src/worker.py` — integrated button routing based on `response_content_sid`.
+  - `tests/test_buttons.py` — 4 tests verifying `ButtonPayload` parsing, text fallback, and response routing.
+  - **Total: 66/66 tests passing.** No regression in text-only Sandbox fallback.
 
 ## In progress
-Nothing — Phase 1 complete, ready for Phase 2.
+Nothing — Phase 2 complete, ready for Phase 3.
 
 ## Next up (in order)
-1. **Phase 2 — WhatsApp Flow for structured intake** (buttons/list messages instead of free text)
-2. Phase 3 — Gemini for Tier 2 extraction + generation, caching from day one
-3. Phase 4 — Tier 3 partner locator + prudential routing
+1. **Phase 3 — Gemini for Tier 2 extraction + generation**, caching from day one.
+2. **Phase 4 — Tier 3 partner locator + prudential routing**.
 
 ## Left / not started
 - Tier 3 (partner locator + prudential routing) with mocked utilization data.
@@ -56,8 +62,8 @@ Nothing — Phase 1 complete, ready for Phase 2.
 ## Session log
 *(Newest first)*
 
+- **2026-09-01 — Phase 2 build & verify.** Gemini 3.1 Pro, Antigravity IDE. Resumed cut-off session that half-implemented Phase 2. Wired up `src/worker.py` to correctly route between button and text messages based on the graph's `response_content_sid`. Wrote `test_buttons.py` and caught state initialization issue in LangGraph testing. Verified dual-mode fallback logic (buttons when possible, text for Sandbox/unsupported). 66/66 tests passing.
 - **2026-08-31 — Phase 1 build.** Claude Opus 4.6, Antigravity IDE. Built schemes.py (Tier 1 eligibility engine), calculator.py (EMI with 3 moratorium treatments), rewrote graph.py (intake flow). Removed unverified age fields from config.py. Created test_schemes.py (26 tests) and test_calculator.py (23 tests). Fixed calculator edge case (zero moratorium). Final: 62/62 tests passing, Phase 0 held.
 - **2026-08-30 — Phase 0 verification.** Claude Opus 4.6, Antigravity IDE. Ran full test suite: 13/13 passing. Phase 0 verified complete. Phase 1 implementation plan created. Planning docs saved to `docs/` directory.
 - **2026-08-30 — Phase 0 build session.** All Phase 0 files created and committed. Initial commit.
 - **2026-08-29 — Planning session.** No code. Produced the full doc suite. Handing off to Sunday's build session.
-

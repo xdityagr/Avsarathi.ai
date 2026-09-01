@@ -1,12 +1,19 @@
 """
-LangGraph conversation graph — Phase 0 + Phase 1.
+LangGraph conversation graph — Phase 0 + Phase 1 + Phase 2.
 
 Phase 0 (proven): check_consent, process_message (echo with state proof)
-Phase 1 (new): process_intake — conversational intake flow for scheme matching
+Phase 1 (proven): process_intake — conversational intake flow for scheme matching
+Phase 2 (new): Quick-reply buttons for categorical fields (project type, gender)
 
 Intake flow collects: project_type → project_cost → annual_income → gender
 Then runs Tier 1 eligibility (schemes.py) + EMI calculator (calculator.py)
 and returns formatted results per phrases.md templates.
+
+Phase 2 additions:
+- button_payload in state: carries Twilio ButtonPayload from webhook
+- response_content_sid in state: when set, worker sends button message
+- Intake steps try ButtonPayload first, fall back to text parsing
+- Dual-mode: use_button_messages=false → pure text (Sandbox-safe)
 
 Architecture.md Non-negotiable #2: Uses LangGraph's own checkpointer
 for state, keyed by thread_id (= WhatsApp number). NOT a custom table.
@@ -43,6 +50,9 @@ class ConversationState(TypedDict):
 
     Phase 1 additions: intake_step, project_type, project_cost,
     annual_income, gender — all populated during the intake flow.
+
+    Phase 2 additions: button_payload (input from webhook),
+    response_content_sid (output — tells worker to send buttons).
     """
     message: str                     # Current inbound message text
     message_count: int               # Total messages from this user (state proof)
@@ -54,6 +64,9 @@ class ConversationState(TypedDict):
     project_cost: float              # In ₹
     annual_income: float             # Family annual income in ₹
     gender: str                      # "male", "female", "other"
+    # Phase 2 — button support
+    button_payload: str              # Twilio ButtonPayload from webhook (e.g. "project_type:business")
+    response_content_sid: str        # If set, worker sends Content Template instead of plain text
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +115,23 @@ PROMPT_GENDER = (
 # ---------------------------------------------------------------------------
 # Input parsing helpers
 # ---------------------------------------------------------------------------
+
+def _parse_button_payload(payload: str, expected_prefix: str) -> Optional[str]:
+    """Parse a structured ButtonPayload value.
+
+    Payloads use the format "prefix:value" (e.g., "project_type:business").
+    Returns the value if prefix matches, None otherwise.
+    """
+    if not payload:
+        return None
+    payload = payload.strip()
+    if ":" not in payload:
+        return None
+    prefix, _, value = payload.partition(":")
+    if prefix.strip() == expected_prefix and value.strip():
+        return value.strip()
+    return None
+
 
 def _parse_project_type(text: str) -> Optional[str]:
     """Parse project type from user text.
@@ -188,12 +218,14 @@ def check_consent(state: ConversationState) -> ConversationState:
                 "consent_given": True,
                 "message_count": 0,
                 "response": "",
+                "response_content_sid": "",
                 # Reset intake state on fresh start
                 "intake_step": "",
                 "project_type": "",
                 "project_cost": 0.0,
                 "annual_income": 0.0,
                 "gender": "",
+                "button_payload": "",
             }
         else:
             return {
@@ -208,15 +240,17 @@ def check_consent(state: ConversationState) -> ConversationState:
                 "consent_given": False,
                 "message_count": 0,
                 "response": STOP_NOTICE,
+                "response_content_sid": "",
                 # Clear intake state
                 "intake_step": "",
                 "project_type": "",
                 "project_cost": 0.0,
                 "annual_income": 0.0,
                 "gender": "",
+                "button_payload": "",
             }
         # Already consented — clear previous response so we proceed to intake
-        return {**state, "response": ""}
+        return {**state, "response": "", "response_content_sid": ""}
 
 
 def route_after_consent(state: ConversationState) -> Literal["process_intake", "__end__"]:
@@ -256,21 +290,25 @@ def process_intake(state: ConversationState) -> ConversationState:
     """Handle the conversational intake flow for scheme matching.
 
     Routes based on intake_step to collect data sequentially:
-    1. "" (empty/first time) → ask project type
-    2. "awaiting_project_type" → parse, ask cost
-    3. "awaiting_cost" → parse, ask income
-    4. "awaiting_income" → parse, ask gender
-    5. "awaiting_gender" → parse, run eligibility + calculator, show results
+    1. "" (empty/first time) → ask project type (buttons if enabled)
+    2. "awaiting_project_type" → parse ButtonPayload or text, ask cost
+    3. "awaiting_cost" → parse text, ask income
+    4. "awaiting_income" → parse text, ask gender (buttons if enabled)
+    5. "awaiting_gender" → parse ButtonPayload or text, run eligibility
     6. "done" → offer to start a new search
 
-    On any parse failure, re-asks the same question with a hint.
+    Phase 2: tries ButtonPayload first for categorical fields,
+    falls back to text parsing. Always works in text-only mode too.
     """
     message = state.get("message", "").strip()
+    button_payload = state.get("button_payload", "")
     intake_step = state.get("intake_step", "")
     count = state.get("message_count", 0) + 1
+    settings = get_settings()
 
     # Handle "start over" / "new" / "reset" at any intake step
     if message.upper() in ("START OVER", "NEW", "RESET", "RESTART"):
+        content_sid = settings.content_sid_project_type if settings.use_button_messages else ""
         return {
             **state,
             "message_count": count,
@@ -279,29 +317,40 @@ def process_intake(state: ConversationState) -> ConversationState:
             "project_cost": 0.0,
             "annual_income": 0.0,
             "gender": "",
+            "button_payload": "",
             "response": "Starting over!\n\n" + PROMPT_PROJECT_TYPE,
+            "response_content_sid": content_sid,
         }
 
     # Step 1: First message after consent — ask project type
     if not intake_step:
+        content_sid = settings.content_sid_project_type if settings.use_button_messages else ""
         return {
             **state,
             "message_count": count,
             "intake_step": "awaiting_project_type",
             "response": PROMPT_PROJECT_TYPE,
+            "response_content_sid": content_sid,
+            "button_payload": "",
         }
 
     # Step 2: Parse project type → ask cost
+    # Phase 2: try ButtonPayload first, then text
     if intake_step == "awaiting_project_type":
-        project_type = _parse_project_type(message)
+        project_type = _parse_button_payload(button_payload, "project_type")
         if project_type is None:
+            project_type = _parse_project_type(message)
+        if project_type is None:
+            content_sid = settings.content_sid_project_type if settings.use_button_messages else ""
             return {
                 **state,
                 "message_count": count,
+                "button_payload": "",
                 "response": (
                     "Sorry, I didn't catch that. "
                     "Please reply *business* or *education*."
                 ),
+                "response_content_sid": content_sid,
             }
         type_label = "project" if project_type == "business" else "course/education"
         return {
@@ -309,7 +358,9 @@ def process_intake(state: ConversationState) -> ConversationState:
             "message_count": count,
             "project_type": project_type,
             "intake_step": "awaiting_cost",
+            "button_payload": "",
             "response": PROMPT_PROJECT_COST.format(type_label=type_label),
+            "response_content_sid": "",  # Cost is always text
         }
 
     # Step 3: Parse project cost → ask income
@@ -332,7 +383,7 @@ def process_intake(state: ConversationState) -> ConversationState:
             "response": PROMPT_ANNUAL_INCOME,
         }
 
-    # Step 4: Parse income → ask gender
+    # Step 4: Parse income → ask gender (buttons if enabled)
     if intake_step == "awaiting_income":
         income = _parse_currency(message)
         if income is None or income < 0:
@@ -344,26 +395,36 @@ def process_intake(state: ConversationState) -> ConversationState:
                     "Please enter your family's annual income in ₹ — "
                     "like 300000, 3 lakh, or 5L."
                 ),
+                "response_content_sid": "",
             }
+        content_sid = settings.content_sid_gender if settings.use_button_messages else ""
         return {
             **state,
             "message_count": count,
             "annual_income": income,
             "intake_step": "awaiting_gender",
             "response": PROMPT_GENDER,
+            "response_content_sid": content_sid,
+            "button_payload": "",
         }
 
     # Step 5: Parse gender → run eligibility + calculator → show results
+    # Phase 2: try ButtonPayload first, then text
     if intake_step == "awaiting_gender":
-        gender = _parse_gender(message)
+        gender = _parse_button_payload(button_payload, "gender")
         if gender is None:
+            gender = _parse_gender(message)
+        if gender is None:
+            content_sid = settings.content_sid_gender if settings.use_button_messages else ""
             return {
                 **state,
                 "message_count": count,
+                "button_payload": "",
                 "response": (
                     "Sorry, I didn't catch that. "
                     "Please reply *male*, *female*, or *other*."
                 ),
+                "response_content_sid": content_sid,
             }
 
         # Build profile and run Tier 1 eligibility
@@ -383,7 +444,9 @@ def process_intake(state: ConversationState) -> ConversationState:
             "message_count": count,
             "gender": gender,
             "intake_step": "done",
+            "button_payload": "",
             "response": response,
+            "response_content_sid": "",
         }
 
     # Step 6: After results — offer to start over

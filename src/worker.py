@@ -24,7 +24,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from src.config import get_settings
 from src.graph import build_graph
-from src.whatsapp import send_whatsapp_message
+from src.whatsapp import send_whatsapp_message, send_whatsapp_buttons
 
 logger = logging.getLogger(__name__)
 
@@ -200,14 +200,29 @@ class MessageWorker:
         # processes the message, and writes state back (atomic write).
         # This is Non-negotiable #2 in architecture.md.
         result = await self._compiled_graph.ainvoke(
-            {"message": body},
+            {
+                "message": body,
+                "button_payload": msg.get("button_payload", ""),
+            },
             config=config,
         )
 
         # Send response (decoupled from webhook — message chain step 7)
+        settings = get_settings()
+        content_sid = result.get("response_content_sid", "")
         response_text = result.get("response", "")
-        if response_text:
+        
+        success = False
+        if content_sid and settings.use_button_messages:
+            success = await send_whatsapp_buttons(
+                to=user_id,
+                content_sid=content_sid,
+                fallback_body=response_text,
+            )
+        elif response_text:
             success = await send_whatsapp_message(to=user_id, body=response_text)
+            
+        if response_text or content_sid:
             if success:
                 logger.info(
                     "Response sent for message %s (worker %d)",

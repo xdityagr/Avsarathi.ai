@@ -65,6 +65,20 @@ class Settings(BaseSettings):
         description="Default moratorium period in months",
     )
 
+    # --- Content Templates (Phase 2 — quick-reply buttons) ---
+    content_sid_project_type: str = Field(
+        default="",
+        description="Twilio Content SID for project type buttons (HXxxxx...)",
+    )
+    content_sid_gender: str = Field(
+        default="",
+        description="Twilio Content SID for gender buttons (HXxxxx...)",
+    )
+    use_button_messages: bool = Field(
+        default=False,
+        description="Send button messages when Content SIDs are configured. False = text-only mode.",
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
