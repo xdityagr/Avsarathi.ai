@@ -198,16 +198,33 @@ class TestProjectCostBoundary:
         scheme_ids = [m.scheme_id for m in matches]
         assert "TERM_LOAN" not in scheme_ids
 
-    def test_educational_loan_no_ceiling(self):
-        """Educational Loan has no project cost ceiling — any amount matches."""
+    def test_educational_loan_at_ceiling(self):
+        """Cost at exactly ₹40,00,000 should match the Educational Loan Scheme.
+
+        This test used to assert that ELS had NO ceiling and that ₹10 crore
+        matched. That came from the PS text, which doesn't state a ceiling.
+        nsfdc.nic.in/scheme does: ₹40 lakh, or 90% of course fees, whichever is
+        less. The corpus now carries the real figure — see data-sources.md §3.1.
+        """
         profile = UserProfile(
             project_type="education",
-            project_cost=100_000_000,  # ₹10 crore — should still match
+            project_cost=4_000_000,
             annual_income=300_000,
         )
         matches = evaluate_eligible_schemes(profile)
         scheme_ids = [m.scheme_id for m in matches]
-        assert "EDUCATIONAL_LOAN" in scheme_ids
+        assert "EDUCATIONAL_LOAN" in scheme_ids, "Cost at exactly ₹40L should match"
+
+    def test_educational_loan_one_over(self):
+        """Cost at ₹40,00,001 should NOT match the Educational Loan Scheme."""
+        profile = UserProfile(
+            project_type="education",
+            project_cost=4_000_001,
+            annual_income=300_000,
+        )
+        matches = evaluate_eligible_schemes(profile)
+        scheme_ids = [m.scheme_id for m in matches]
+        assert "EDUCATIONAL_LOAN" not in scheme_ids
 
 
 # ---------------------------------------------------------------------------
@@ -217,18 +234,38 @@ class TestProjectCostBoundary:
 class TestProjectTypeRouting:
     """Test that project type correctly routes to scheme candidates."""
 
-    def test_business_gets_micro_finance_and_term_loan(self):
-        """Business project should match both Micro Finance and Term Loan."""
+    def test_small_business_gets_micro_finance_not_term_loan(self):
+        """A ₹1 lakh project is below Term Loan's ₹1.40 lakh floor.
+
+        This test previously asserted that ₹1 lakh matched Term Loan too. It
+        doesn't: nsfdc.nic.in/scheme puts Term Loan at ₹1.40 lakh to ₹50 lakh,
+        so small projects belong to the micro-finance products. That floor is
+        what produces the demo's Why-Not line.
+        """
         profile = UserProfile(
             project_type="business",
-            project_cost=100_000,  # Under both ceilings
+            project_cost=100_000,
             annual_income=300_000,
         )
         matches = evaluate_eligible_schemes(profile)
         scheme_ids = {m.scheme_id for m in matches}
         assert "MICRO_FINANCE" in scheme_ids
-        assert "TERM_LOAN" in scheme_ids
+        assert "AAJEEVIKA_MICRO_FINANCE" in scheme_ids
+        assert "TERM_LOAN" not in scheme_ids, "₹1L is below Term Loan's ₹1.40L floor"
         assert "EDUCATIONAL_LOAN" not in scheme_ids
+
+    def test_larger_business_gets_term_loan_not_micro_finance(self):
+        """A ₹2 lakh project clears Term Loan's floor and exceeds the micro ceiling."""
+        profile = UserProfile(
+            project_type="business",
+            project_cost=200_000,
+            annual_income=300_000,
+        )
+        matches = evaluate_eligible_schemes(profile)
+        scheme_ids = {m.scheme_id for m in matches}
+        assert "TERM_LOAN" in scheme_ids
+        assert "UDYAM_NIDHI" in scheme_ids
+        assert "MICRO_FINANCE" not in scheme_ids, "₹2L is over the ₹1.40L micro ceiling"
 
     def test_education_gets_educational_loan_only(self):
         """Education project should only match Educational Loan."""

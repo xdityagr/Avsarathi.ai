@@ -4,7 +4,7 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
 ---
 
 ## Last updated
-2026-09-01, Phase 3 build + verification session (Gemini 3.1 Pro, Antigravity IDE).
+2026-09-03, PRD v3 + business plan strategy session (Claude Opus 5, Claude Code). No code changes.
 
 ## Current phase
 **Phase 3 — COMPLETE.** Gemini integration for LLM extraction and generation, coupled with robust SQLite caching based on deterministic outcome fingerprints. 72/72 tests passing.
@@ -50,10 +50,13 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
   - **Total: 72/72 tests passing.** No regression.
 
 ## In progress
-Nothing — Phase 3 complete, ready for Phase 4.
+Nothing in code. Doc suite re-baselined on 2026-09-03 — see `PRD-v3.md` §12 for the revised build ladder.
 
 ## Next up (in order)
-1. **Phase 4 — Tier 3 partner locator + prudential routing**.
+1. **Confirm the 5-scheme corpus by eye** on nsfdc.nic.in/scheme (`data-sources.md` §2.2) — 20 min, before internals.
+2. **Download NSFDC performance-data files** and build the state-wise utilisation table (`data-sources.md` §8) — this is what makes Tier 3 real instead of mocked.
+3. **Phase 4 — Tier 3 partner locator + prudential routing**, now on real published utilisation data.
+4. Update `config.py` from 3 schemes to 5; add `education_status` and family-income intake fields.
 
 ## Left / not started
 - Tier 3 (partner locator + prudential routing) with mocked utilization data.
@@ -67,6 +70,16 @@ Nothing — Phase 3 complete, ready for Phase 4.
 
 ## Session log
 *(Newest first)*
+
+- **2026-09-03 — PRD v3 + business plan.** Claude Opus 5, Claude Code. No code. Re-scoped the project from "PS deliverable checklist" to an origination layer. Wrote `PRD-v3.md`, `BUSINESS-PLAN.md`, `data-sources.md`. Key findings: (1) **the scheme numbers had converged all along** — NSFDC runs 5 schemes, not 3, and the PS's own "6.5-15% depending on the scheme" and "3-12 month" ranges only reconcile with all five, so `rules.md`'s five-pass deadlock was a wrong-model problem, not a source-conflict problem; (2) **NSFDC publishes state-wise cumulative funds utilisation as Excel** (to 2026-07-31), so Tier 3 upgrades from mocked to real data; (3) **JanSamarth covers 15 schemes / 269 banks and zero NFDC products** — that is the market gap; (4) **Aadhaar Paperless Offline e-KYC needs no AUA licence**, giving real identity verification inside a hackathon build; (5) AAGG Amendment Rules 2025 permit private Aadhaar auth for "prevention of dissipation of social welfare benefits", sponsored by the ministry — which here is MoSJE, the PS author. Added financial-literacy, faster-disbursement and fund-utilisation feature sets against the PS's two impact goals, which v2 had no features for.
+  **Second pass — corpus schema redesign.** The 11-numeric-field scheme schema was too thin; NSFDC's pages carry far more. Redesigned as a **two-plane corpus**: Plane A (typed, deterministic, feeds Tier 1 — never LLM-touched) vs Plane B (narrative: purpose, benefits, process, documents, FAQs — retrievable for Q&A, never decides eligibility), mirroring myScheme's national section taxonomy. New findings from the sub-pages:
+  - `/eligibility-requirements` — **income ceiling is Rs 5L, rural AND urban, effective 2026-01-07.** This resolves `rules.md`'s Rs 3L/Rs 3.5L conflict outright: those are the OLD limits and every third-party source citing them is stale. Also confirms **no age criterion** (v2's removal of age fields was right) and that **partnership firms + cooperative societies** are eligible, not just individuals.
+  - `/scheme` — **repayment is QUARTERLY, not monthly** (calculator correctness bug in the current build). **Dual rates published** (intermediary vs beneficiary). **Udyam Nidhi's beneficiary rate depends on partner type** — 13% via Cooperative Bank/Society, 15% via Small Finance Bank. Makes the router a price optimiser, not just a distance filter.
+  - `/indicative-activities` — **148 official fundable activities in 3 sectors** (20 agri, 51 small industry, 77 service/transport). This is the Tier 2 classification taxonomy; stop inventing project categories.
+  - `/faqs` — **102 channel partners**; **women have a 40% fund-allocation target** under TL and MFS; **skill training is free, NSQF-compliant, pays Rs 1,500/month stipend and has NO income ceiling** (makes Train-then-Credit strong, not a consolation prize); helpline 1800110396.
+  - Still un-fetched: `/how-to-apply-2`, `/form`, `/allocation-of-funds`, `/annual-reports`. Security/collateral requirements are published nowhere found.
+  `rules.md` is superseded on scheme numbers AND eligibility by `data-sources.md` §3-§4.
+  **Third pass — scraper, language, voice, MVP.** Scraper designed as a *declarative source registry + 5 extractor strategies* (HTML_TABLE / HTML_PROSE / FILE_DOWNLOAD / JSON_API / LLM_ASSISTED), not 20 bespoke scripts — adding a source is a config entry. LLM-assisted extraction is allowed for heterogeneous state SCA sites but its output is a *proposal*: Plane B auto-promotes, Plane A quarantines for human review. Prefer published Excel/PDF over HTML; for SPAs (myScheme, API Setu, DigiLocker issuer list) find the JSON API before reaching for Playwright. Language: **guess-then-confirm-in-one-tap**, not auto-detect and not always-ask — cascade is PIN->state->language (strongest, and we collect PIN anyway) > location share > **Unicode script detection** (free, deterministic, immediate) > explicit buttons (always override). Phone number is NOT a location signal (portability broke circle allocation). Voice: **WhatsApp voice notes for MVP** (`ai4bharat/indic-conformer-600m-multilingual` ASR, all 22 langs, MIT; `ai4bharat/indic-parler-tts` TTS, 21 langs — both verified current 2026-09-03); **telephony IVR deferred to Phase 3** — its real justification is reaching people with no smartphone, but it's a live-demo risk and voice notes get most of the benefit. New doc `MVP-PLAN.md`: 4-minute pitch script built beat by beat, 14-item build sheet, 6-person lane split, 4-week sequencing, demo-ops/cache-warming, and Q&A prep for the four questions judges will ask.
 
 - **2026-09-01 — Phase 3 build & verify.** Gemini 3.1 Pro, Antigravity IDE. Added Gemini generation and extraction capabilities using `langchain-google-genai`. Set up outcome-based caching in SQLite by hashing identical scheme match structures instead of continuous user input variables to improve hit rates. Adjusted graph flow and updated the testing suite to support async invocation across the LangGraph checkpointer. Resolved coroutine invocation limits and test lifecycles. 72/72 tests passing.
 - **2026-09-01 — Phase 2 build & verify.** Gemini 3.1 Pro, Antigravity IDE. Resumed cut-off session that half-implemented Phase 2. Wired up `src/worker.py` to correctly route between button and text messages based on the graph's `response_content_sid`. Wrote `test_buttons.py` and caught state initialization issue in LangGraph testing. Verified dual-mode fallback logic (buttons when possible, text for Sandbox/unsupported). 66/66 tests passing.

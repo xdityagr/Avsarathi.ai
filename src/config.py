@@ -8,11 +8,11 @@ when a verified NSFDC number comes back from the SPOC meeting.
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
+
+from src.corpus import legacy_schemes_dict
 from pydantic import Field
 
 
@@ -90,6 +90,17 @@ class Settings(BaseSettings):
         description="Model for generation on cache miss"
     )
 
+    # --- Financial literacy (PS impact goal: "enhance financial literacy") ---
+    moneylender_monthly_rate_pct: float = Field(
+        default=5.0,
+        description=(
+            "Informal moneylender rate, % PER MONTH, used for the comparison that "
+            "shows what a concessional loan is actually worth. Rates of 3-10%/month "
+            "are typical. A config value, not a literal, because the honest answer "
+            "to 'where did that number come from' is 'it's an assumption you can change'."
+        ),
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",
@@ -104,82 +115,23 @@ def get_settings() -> Settings:
 
 
 # ---------------------------------------------------------------------------
-# Scheme configuration — from rules.md
-# CONFIDENCE: PS-stated (authoritative for judging)
-# Every number here is a config value, not a hardcoded constant.
-# Update THIS dict when verified numbers come back, not the logic code.
+# Scheme configuration — DERIVED FROM THE CORPUS. Do not edit here.
 #
-# NOTE: no age field, deliberately. No age eligibility boundary for any of
-# these three schemes has been confirmed against the PS text or nsfdc.nic.in.
-# prd.md's illustrative code has age bounds — those are a known-unconfirmed
-# leftover, NOT a source to copy from. Don't add age fields without real
-# confirmation from Monday's SPOC meeting or a direct NSFDC contact.
+# This used to be a literal dict of three schemes. It is now a view over
+# corpus/v1/schemes.json, which holds all five schemes NSFDC actually publishes
+# along with per-field provenance (source URL, fetch date, confidence).
+#
+# To change a scheme number, edit the corpus JSON — not this file. That keeps a
+# rate change reviewable as a diff, which is the whole point: docs/rules.md
+# spent five research passes on numbers that had in fact already converged,
+# because there was no single place where a number and its source lived together.
+#
+# NO AGE FIELD, still — but the reason has been upgraded. It used to be "no age
+# boundary has been confirmed". nsfdc.nic.in/eligibility-requirements states no
+# age condition at all, so its absence is now CONFIRMED, not merely unverified.
 # ---------------------------------------------------------------------------
 
-SCHEMES = {
-    "MICRO_FINANCE": {
-        "name": "Micro Finance Scheme",
-        "max_project_cost": 140_000,
-        "financing_pct": 0.90,
-        "rate_min": 6.5,
-        "rate_max": 8.0,
-        "moratorium_months_min": 3,
-        "moratorium_months_max": 12,
-        "max_income": 500_000,
-    },
-    "TERM_LOAN": {
-        "name": "Term Loan",
-        "max_project_cost": 5_000_000,
-        "financing_pct": 0.90,
-        "rate_min": 6.5,
-        "rate_max": 15.0,  # PS "Expected Solution" — wider range, tiered by loan size
-        "moratorium_months_min": 3,
-        "moratorium_months_max": 12,
-        "max_income": 500_000,
-    },
-    "EDUCATIONAL_LOAN": {
-        "name": "Educational Loan Scheme",
-        "max_project_cost": None,  # PS doesn't state a ceiling; unresolved across sources
-        "financing_pct": 0.90,
-        "rate_min": 6.5,
-        "rate_max": 8.0,
-        "moratorium_months_min": 3,
-        "moratorium_months_max": 12,
-        "max_income": 500_000,
-        "women_rebate_pct": 0.5,  # Consistent across every source — solid
-    },
-}
-
-# ---------------------------------------------------------------------------
-# NSFDC direct verification — more specific than PS text.
-# Use if you want the tiered-rate story for the pitch, but don't silently
-# contradict the PS numbers above without explaining why in the demo.
-# CONFIDENCE: verified directly against nsfdc.nic.in
-# ---------------------------------------------------------------------------
-
-NSFDC_DIRECT_VERIFICATION = {
-    "TERM_LOAN_ALT": {
-        "partner_rate": 4.0,
-        "beneficiary_rate": 8.0,
-        "tenure_years": 7,
-        "moratorium_months": 6,
-    },
-    "UTKARSH_LOAN": {
-        "min_project_cost": 1_000_000,
-        "max_project_cost": 5_000_000,
-        "beneficiary_rate": 9.0,
-        "financing_pct": 0.90,
-        "tenure_years": 7,
-        "moratorium_months": 6,
-    },
-    "EDUCATIONAL_LOAN_ALT": {
-        "partner_rate": 1.5,
-        "beneficiary_rate": 4.0,
-        "women_rebate_pct": 0.5,
-        "tenure_years": 7,
-        "moratorium_months": 6,
-    },
-}
+SCHEMES = legacy_schemes_dict()
 
 # ---------------------------------------------------------------------------
 # Prudential norms — Tier 3
