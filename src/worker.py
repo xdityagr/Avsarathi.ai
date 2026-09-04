@@ -90,6 +90,7 @@ class MessageWorker:
         self.queue = queue
         self._compiled_graph = None
         self._checkpointer = None
+        self._checkpointer_cm = None
         self._rate_limiter = RateLimiter(
             max_tokens=get_settings().max_messages_per_user_per_minute,
             window_seconds=60.0,
@@ -102,9 +103,19 @@ class MessageWorker:
 
         # Create the checkpointer — this manages its own SQLite tables
         # for conversation state (architecture.md Non-negotiable #2)
-        self._checkpointer = AsyncSqliteSaver.from_conn_string(
+        #
+        # from_conn_string() returns an ASYNC CONTEXT MANAGER, not a saver. The
+        # previous code called .setup() on the context manager itself, which
+        # raised AttributeError the first time the app was actually started —
+        # the unit tests stub _checkpointer out, so nothing caught it until the
+        # server ran for real.
+        #
+        # A worker with start()/stop() can't use `async with` around its whole
+        # life, so enter the context explicitly here and exit it in stop().
+        self._checkpointer_cm = AsyncSqliteSaver.from_conn_string(
             settings.database_path,
         )
+        self._checkpointer = await self._checkpointer_cm.__aenter__()
         await self._checkpointer.setup()
 
         # Build and compile the graph with the checkpointer
@@ -132,6 +143,17 @@ class MessageWorker:
         # Cancel all background tasks
         for task in _background_tasks.copy():
             task.cancel()
+
+        # Close the checkpointer's SQLite connection. Paired with the explicit
+        # __aenter__ in start() — see the note there.
+        if self._checkpointer_cm is not None:
+            try:
+                await self._checkpointer_cm.__aexit__(None, None, None)
+            except Exception as exc:
+                logger.warning("Checkpointer did not close cleanly: %s", exc)
+            finally:
+                self._checkpointer_cm = None
+                self._checkpointer = None
 
     async def _worker_loop(self, worker_id: int) -> None:
         """Main worker loop — dequeue, process, send response.

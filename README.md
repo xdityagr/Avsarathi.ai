@@ -29,6 +29,25 @@ uvicorn src.main:app --reload --port 8000
 pytest
 ```
 
+## Run the web portal locally
+
+```bash
+pip install -e ".[dev]"
+uvicorn src.main:app --reload --port 8000
+# open http://localhost:8000
+```
+
+Three tabs:
+- **Find a scheme** — the beneficiary flow: eligibility, why you don't qualify for
+  the rest, what the loan really costs against a moneylender, and which partner
+  can actually disburse.
+- **Channel partners** — every agency with the figure each prudential rule is
+  assessed against, and whether that figure is published or representative.
+- **Scheme corpus** — all five NSFDC schemes with their provenance.
+
+No API keys needed for the portal — the whole path is deterministic, with no LLM
+call. WhatsApp needs Twilio credentials in `.env`; the portal does not.
+
 ## Architecture
 
 Three-tier recommendation pipeline:

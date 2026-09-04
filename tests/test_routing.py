@@ -67,32 +67,61 @@ class TestHaversine:
 # SCA utilisation — the norm running on real published data
 # ---------------------------------------------------------------------------
 
-class TestSCAUtilisationBoundary:
-    """Fresh releases require 100% cumulative utilisation. Test the edge."""
+class TestUtilisationIsCapacityNotExclusion:
+    """Low utilisation must NOT exclude an agency.
 
-    def test_at_exactly_one_hundred_percent_is_viable(self):
+    This was implemented the wrong way round first, and it inverted the product.
+    The 100% norm governs whether NSFDC releases FRESH money TO an agency. It
+    says nothing about whether that agency can lend to a beneficiary today — and
+    an agency below 100% is by definition holding funds it has already received
+    and not yet deployed.
+
+    The PS names its exclusion criteria explicitly: "partners with high NPAs or
+    overdues". Not low utilisation. And excluding idle-fund agencies is the exact
+    opposite of the "better fund utilisation" impact goal.
+    """
+
+    def test_agency_below_the_norm_is_still_viable(self):
+        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI, [_sca(util=0.46)])
+        assert len(result.viable) == 1, "An agency holding undeployed funds can lend"
+        assert result.excluded == []
+
+    def test_agency_at_the_norm_is_viable(self):
         result = route_partners(_scheme("MICRO_FINANCE"), *DELHI, [_sca(util=1.0)])
         assert len(result.viable) == 1
         assert result.excluded == []
 
-    def test_just_under_one_hundred_percent_is_excluded(self):
-        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI, [_sca(util=0.99)])
-        assert result.viable == []
-        assert len(result.excluded) == 1
-        assert result.excluded[0].rule == "SCA_UTILISATION"
+    def test_idle_funds_beat_a_fully_deployed_agency(self):
+        """Demand should flow toward money that is sitting still."""
+        idle = _sca("IDLE", "Agency Holding Funds", util=0.46, headroom=9000.0)
+        spent = _sca("SPENT", "Fully Deployed Agency", util=2.18, headroom=0.0)
+        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI, [spent, idle])
+        assert result.viable[0].partner.partner_id == "IDLE"
 
-    def test_exclusion_reason_is_shaped_for_a_user(self):
-        """The 1:45 demo beat — the exclusion must explain itself."""
-        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI, [_sca(util=0.78)])
-        reason = result.excluded[0].reason
-        assert "78%" in reason
-        assert "cannot" in reason.lower()
+    def test_utilisation_note_explains_without_a_verdict(self):
+        from src.routing import utilisation_note
+        holding = utilisation_note(_sca(util=0.46, headroom=9000.0))
+        deployed = utilisation_note(_sca(util=2.18, headroom=0.0))
+        assert "available now" in holding
+        assert "fresh NSFDC releases" in deployed
+
+
+class TestHardExclusions:
+    """What DOES exclude: overdues and NPAs — the PS's own parenthetical."""
 
     def test_overdues_exclude_regardless_of_utilisation(self):
         result = route_partners(_scheme("MICRO_FINANCE"), *DELHI,
                                 [_sca(util=2.0, overdues=True)])
         assert result.viable == []
         assert result.excluded[0].rule == "SCA_OVERDUES"
+
+    def test_exclusion_reason_is_shaped_for_a_user(self):
+        """The 1:45 demo beat — the exclusion must explain itself."""
+        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI,
+                                [_sca(util=1.2, overdues=True)])
+        reason = result.excluded[0].reason
+        assert "overdue" in reason.lower()
+        assert "cannot" in reason.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -223,5 +252,6 @@ class TestDisclosure:
         assert "representative" in result.disclosure.lower()
 
     def test_exclusions_render_for_the_user(self):
-        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI, [_sca(util=0.6)])
-        assert "60%" in format_exclusions(result)
+        result = route_partners(_scheme("MICRO_FINANCE"), *DELHI,
+                                [_sca(util=1.2, overdues=True)])
+        assert "overdue" in format_exclusions(result).lower()

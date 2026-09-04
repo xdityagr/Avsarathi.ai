@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Avsarathi — NSFDC scheme finder</title>
+<style>
+  /* Palette: ink ground, paper working surface. Ochre carries money figures
+     (institutional stamp, not startup orange); teal marks published provenance;
+     deep red marks what is blocked or what the informal lender costs. */
+  :root{
+    --ink:#1A1D2E; --ink-soft:#3A3F58;
+    --paper:#FBFAF7; --panel:#FFFFFF;
+    --rule:#DCD8CE; --rule-strong:#B9B4A7;
+    --ochre:#9A5B0B; --teal:#1F6F5C; --flag:#A32E2E;
+    --muted:#6B6858;
+    --sans: ui-sans-serif, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ---- masthead ---- */
+  header{background:var(--ink); color:#EDEAE2; padding:0 20px}
+  .bar{max-width:1180px; margin:0 auto; display:flex; align-items:baseline;
+       gap:28px; flex-wrap:wrap; padding:16px 0 0}
+  .mark{font-size:19px; font-weight:650; letter-spacing:-.015em}
+  .mark span{color:#8E93AE; font-weight:400}
+  .sub{color:#9AA0B8; font-size:13px; margin-left:auto}
+  nav{max-width:1180px; margin:0 auto; display:flex; gap:2px; padding-top:14px}
+  nav button{
+    background:none; border:0; border-bottom:3px solid transparent;
+    color:#9AA0B8; font:inherit; font-size:14px; padding:9px 15px; cursor:pointer;
+  }
+  nav button:hover{color:#EDEAE2}
+  nav button[aria-selected="true"]{color:#fff; border-bottom-color:var(--ochre)}
+  nav button:focus-visible{outline:2px solid #fff; outline-offset:-2px}
+
+  main{max-width:1180px; margin:0 auto; padding:26px 20px 80px}
+  [hidden]{display:none!important}
+
+  /* ---- intake strip ---- */
+  form{
+    background:var(--panel); border:1px solid var(--rule);
+    display:flex; flex-wrap:wrap; align-items:flex-end; gap:0;
+  }
+  .f{padding:12px 16px; border-right:1px solid var(--rule); flex:1 1 150px}
+  .f:last-of-type{border-right:0}
+  label{display:block; font-size:12px; color:var(--muted); margin-bottom:5px}
+  input,select{
+    width:100%; border:0; border-bottom:1.5px solid var(--rule-strong);
+    background:none; font:inherit; font-size:16px; color:var(--ink);
+    padding:3px 0; border-radius:0;
+  }
+  input:focus,select:focus{outline:0; border-bottom-color:var(--ochre)}
+  .submit{padding:12px 16px; border-left:1px solid var(--rule)}
+  button.go{
+    background:var(--ink); color:#fff; border:0; font:inherit; font-size:15px;
+    padding:11px 26px; cursor:pointer;
+  }
+  button.go:hover{background:#2A2F4A}
+  button.go:focus-visible{outline:2px solid var(--ochre); outline-offset:2px}
+  button.go[disabled]{opacity:.5; cursor:progress}
+
+  h2{font-size:13px; font-weight:650; color:var(--muted); margin:34px 0 10px}
+  h3{font-size:17px; font-weight:600; margin:0}
+
+  /* ---- the one bold element: cost of credit, at true relative scale ---- */
+  .compare{background:var(--ink); color:#EDEAE2; padding:26px 24px; margin-top:22px; overflow:hidden}
+  .compare .cap{font-size:13px; color:#9AA0B8; margin-bottom:18px}
+  .row2{display:grid; grid-template-columns:190px 1fr; gap:14px; align-items:center; margin-bottom:12px}
+  .row2 .who{font-size:14px; color:#C6C9D8}
+  .track{position:relative; height:38px}
+  .fill{height:100%; display:flex; align-items:center; padding:0 12px;
+        font-size:17px; font-weight:650; white-space:nowrap; min-width:max-content}
+  .fill.good{background:var(--teal); color:#fff}
+  .fill.bad{background:var(--flag); color:#fff}
+  .compare .foot{font-size:13px; color:#9AA0B8; margin-top:16px; max-width:70ch}
+
+  /* ---- ledger rows ---- */
+  .ledger{background:var(--panel); border:1px solid var(--rule)}
+  .sch{display:grid; grid-template-columns:1fr auto; gap:18px;
+       padding:15px 18px; border-bottom:1px solid var(--rule)}
+  .sch:last-child{border-bottom:0}
+  .sch.best{border-left:4px solid var(--ochre)}
+  .sch .why{font-size:13px; color:var(--muted); margin-top:5px; max-width:74ch}
+  .figs{text-align:right; white-space:nowrap}
+  .big{font-size:20px; font-weight:650; color:var(--ochre)}
+  .lil{font-size:12.5px; color:var(--muted); margin-top:3px}
+  .tag{display:inline-block; font-size:11.5px; padding:2px 7px; border:1px solid currentColor;
+       vertical-align:2px; margin-left:8px}
+  .tag.cheap{color:var(--ochre)}
+  .tag.official{color:var(--teal)}
+  .tag.mock{color:var(--muted)}
+
+  .blocked{border-left:4px solid var(--flag)}
+  .blocked .why{color:var(--ink-soft)}
+
+  .cols{display:grid; grid-template-columns:1.25fr 1fr; gap:26px; align-items:start}
+  @media(max-width:860px){.cols{grid-template-columns:1fr}
+    .row2{grid-template-columns:1fr; gap:4px} }
+
+  img.map{width:100%; display:block; border:1px solid var(--rule)}
+
+  table{width:100%; border-collapse:collapse; background:var(--panel);
+        border:1px solid var(--rule); font-size:14px}
+  th{text-align:left; font-weight:600; font-size:12px; color:var(--muted);
+     padding:10px 12px; border-bottom:1.5px solid var(--rule-strong)}
+  td{padding:10px 12px; border-bottom:1px solid var(--rule); vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.r,th.r{text-align:right}
+
+  .note{font-size:13px; color:var(--muted); max-width:78ch; margin:10px 0 0}
+  .warn{background:#FFF8E8; border:1px solid #E3D2A8; padding:12px 14px;
+        font-size:13.5px; margin-top:18px; max-width:80ch}
+  .empty{background:var(--panel); border:1px dashed var(--rule-strong);
+         padding:22px; color:var(--muted)}
+  pre.blk{font-family:inherit; white-space:pre-wrap; margin:0; font-size:14px}
+
+  @media(prefers-reduced-motion:no-preference){
+    .fill{transition:width .5s cubic-bezier(.2,.7,.3,1)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="mark">Avsarathi <span>/ NSFDC</span></div>
+    <div class="sub">Scheme matching for Scheduled Caste beneficiaries</div>
+  </div>
+  <nav role="tablist">
+    <button role="tab" id="t-find" aria-selected="true" onclick="show('find')">Find a scheme</button>
+    <button role="tab" id="t-partners" aria-selected="false" onclick="show('partners')">Channel partners</button>
+    <button role="tab" id="t-corpus" aria-selected="false" onclick="show('corpus')">Scheme corpus</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ================= FIND ================= -->
+  <section id="p-find">
+    <form onsubmit="findSchemes(event)">
+      <div class="f">
+        <label for="ptype">Purpose</label>
+        <select id="ptype"><option value="business">Business or self-employment</option>
+          <option value="education">Education</option></select>
+      </div>
+      <div class="f">
+        <label for="cost">What will it cost? (₹)</label>
+        <input id="cost" class="num" type="number" min="0" step="1000" value="120000" required>
+      </div>
+      <div class="f">
+        <label for="income">Family income a year (₹)</label>
+        <input id="income" class="num" type="number" min="0" step="1000" value="280000" required>
+      </div>
+      <div class="f">
+        <label for="cat">Category</label>
+        <select id="cat"><option>SC</option><option>ST</option><option>OBC</option>
+          <option>MINORITY</option><option>GENERAL</option></select>
+      </div>
+      <div class="f">
+        <label for="gender">Applicant</label>
+        <select id="gender"><option value="female">Woman</option><option value="male">Man</option>
+          <option value="other">Other</option></select>
+      </div>
+      <div class="f">
+        <label for="edu">Education</label>
+        <select id="edu"><option value="unknown">Not given</option>
+          <option value="below_10th">Below class 10</option>
+          <option value="10th_to_12th">Class 10–12</option>
+          <option value="graduate_plus">Graduate or above</option></select>
+      </div>
+      <div class="f">
+        <label for="where">Where are you?</label>
+        <select id="where">
+          <option value="25.7585,84.1487|Uttar Pradesh">Ballia, Uttar Pradesh</option>
+          <option value="28.6139,77.2090|Delhi">New Delhi</option>
+          <option value="19.0760,72.8777|Maharashtra">Mumbai, Maharashtra</option>
+          <option value="13.0827,80.2707|Tamil Nadu">Chennai, Tamil Nadu</option>
+          <option value="">Not given</option>
+        </select>
+      </div>
+      <div class="submit"><button class="go" id="go" type="submit">Find schemes</button></div>
+    </form>
+
+    <div id="out"></div>
+  </section>
+
+  <!-- ================= PARTNERS ================= -->
+  <section id="p-partners" hidden>
+    <p class="note">Every channel partner in the system, with the figure each prudential
+      rule is assessed against. Utilisation is NSFDC's own published state-wise data;
+      branch-level NPAs are representative, because no public source publishes them.</p>
+    <div id="partners"></div>
+  </section>
+
+  <!-- ================= CORPUS ================= -->
+  <section id="p-corpus" hidden>
+    <p class="note" id="corpus-note"></p>
+    <div id="corpus"></div>
+  </section>
+</main>
+
+<script>
+const rupee = n => "₹" + Math.round(n).toLocaleString("en-IN");
+const pct = n => (n * 100).toFixed(0) + "%";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function show(tab){
+  for (const id of ["find","partners","corpus"]){
+    document.getElementById("p-"+id).hidden = (id !== tab);
+    document.getElementById("t-"+id).setAttribute("aria-selected", String(id === tab));
+  }
+  if (tab === "partners") loadPartners();
+  if (tab === "corpus") loadCorpus();
+}
+
+async function findSchemes(e){
+  e.preventDefault();
+  const btn = document.getElementById("go");
+  btn.disabled = true; btn.textContent = "Checking…";
+  const [coords, state] = (document.getElementById("where").value || "|").split("|");
+  const [lat, lon] = (coords || ",").split(",");
+  const body = {
+    project_type: document.getElementById("ptype").value,
+    project_cost: +document.getElementById("cost").value,
+    annual_income: +document.getElementById("income").value,
+    category: document.getElementById("cat").value,
+    gender: document.getElementById("gender").value,
+    education_status: document.getElementById("edu").value,
+    latitude: lat ? +lat : null, longitude: lon ? +lon : null, state: state || null,
+  };
+  try {
+    const res = await fetch("/api/recommend", {
+      method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    render(await res.json());
+  } catch (err) {
+    document.getElementById("out").innerHTML =
+      `<div class="empty">Couldn't reach the scheme engine (${esc(err.message)}). Is the server running?</div>`;
+  } finally { btn.disabled = false; btn.textContent = "Find schemes"; }
+}
+
+function render(d){
+  const o = [];
+
+  if (!d.eligible){
+    o.push(`<div class="empty"><h3>No NSFDC scheme fits this profile</h3>
+      <p class="note">${esc(d.category_note || "")}</p></div>`);
+    if (d.why_not) o.push(whyNot(d));
+    document.getElementById("out").innerHTML = o.join("");
+    return;
+  }
+
+  const best = d.schemes[0];
+
+  // The one bold element: what credit costs, at true relative scale.
+  const worst = Math.max(best.total_interest, informal(best));
+  const w = v => Math.max(8, (v / worst) * 100) + "%";
+  o.push(`<div class="compare">
+    <div class="cap">What the same ${rupee(best.loan_amount)} costs you in interest</div>
+    <div class="row2"><div class="who">${esc(best.name)}, ${best.rate}% a year</div>
+      <div class="track"><div class="fill good" style="width:${w(best.total_interest)}">${rupee(best.total_interest)}</div></div></div>
+    <div class="row2"><div class="who">A moneylender at 5% a month</div>
+      <div class="track"><div class="fill bad" style="width:${w(informal(best))}">${rupee(informal(best))}</div></div></div>
+    <p class="foot">Assumes interest paid monthly and the principal repaid at the end, over the
+      same ${best.instalment_count} instalments — the usual local arrangement.</p>
+  </div>`);
+
+  o.push(`<h2>What you qualify for</h2><div class="ledger">`);
+  d.schemes.forEach((s, i) => {
+    o.push(`<div class="sch ${i === 0 ? "best" : ""}">
+      <div><h3>${esc(s.name)}${i === 0 && d.schemes.length > 1 ? '<span class="tag cheap">cheapest</span>' : ""}</h3>
+        <div class="why">${esc(s.why_eligible)}</div>
+        ${s.blocks.priority ? `<div class="why">${esc(s.blocks.priority.replace(/_/g,""))}</div>` : ""}</div>
+      <div class="figs"><div class="big num">${rupee(s.total_interest)}</div>
+        <div class="lil num">interest at ${s.rate}%</div>
+        <div class="lil num">${rupee(s.instalment_amount)} ${esc(s.instalment_frequency)} × ${s.instalment_count}</div>
+        <div class="lil num">about ${rupee(s.monthly_equivalent)} a month</div></div></div>`);
+  });
+  o.push(`</div>`);
+
+  if (d.scheme_comparison)
+    o.push(`<div class="warn"><pre class="blk">${esc(d.scheme_comparison.replace(/\*/g,""))}</pre></div>`);
+
+  if (d.rejections.length) o.push(whyNot(d));
+
+  o.push(`<div class="cols"><div>`);
+  o.push(`<h2>Where to go</h2>`);
+  if (d.partners.length){
+    o.push(`<div class="ledger">`);
+    d.partners.forEach((p, i) => {
+      const conf = p.confidence === "OFFICIAL"
+        ? '<span class="tag official">published data</span>'
+        : '<span class="tag mock">representative</span>';
+      o.push(`<div class="sch"><div><h3>${i+1}. ${esc(p.name)}</h3>
+        <div class="why">${esc(p.district)}, ${esc(p.state)} — ${esc(p.agency_type)}${conf}</div>
+        ${p.note ? `<div class="why">${esc(p.note)}</div>` : ""}
+        ${p.reasons.length ? `<div class="why">${esc(p.reasons.join("; "))}</div>` : ""}</div>
+        <div class="figs"><div class="big num">${p.distance_km} km</div>
+          <div class="lil num">${p.rate}% to you</div></div></div>`);
+    });
+    o.push(`</div>`);
+  } else {
+    o.push(`<div class="empty">No partner within range can process this scheme yet.</div>`);
+  }
+
+  if (d.excluded_partners.length){
+    o.push(`<h2>Cannot help you right now</h2><div class="ledger">`);
+    d.excluded_partners.forEach(e => o.push(
+      `<div class="sch blocked"><div><h3>${esc(e.name)}</h3>
+        <div class="why">${esc(e.reason)}</div></div><div class="figs"></div></div>`));
+    o.push(`</div>`);
+  }
+  if (d.routing_disclosure) o.push(`<p class="note">${esc(d.routing_disclosure)}</p>`);
+
+  o.push(`</div><div>`);
+  if (d.map_url) o.push(`<h2>Nearest partners</h2><img class="map" alt="Map of the nearest channel partners" src="${esc(d.map_url)}">`);
+  o.push(`<div class="warn">${esc(d.fraud_shield.replace(/\*/g,""))}</div>`);
+  o.push(`</div></div>`);
+
+  document.getElementById("out").innerHTML = o.join("");
+}
+
+// Informal-lender cost, mirrored from src/literacy.py so the bar matches the text.
+const informal = s => s.loan_amount * 0.05 * (s.instalment_count * (12 / 4));
+
+function whyNot(d){
+  return `<h2>Not a match, and why</h2><div class="ledger">` +
+    d.rejections.map(r => `<div class="sch"><div><h3>${esc(r.name)}</h3>
+      <div class="why">${esc(r.reason)}</div></div><div class="figs"></div></div>`).join("") +
+    `</div>`;
+}
+
+let partnersLoaded = false;
+async function loadPartners(){
+  if (partnersLoaded) return; partnersLoaded = true;
+  const d = await (await fetch("/api/partners")).json();
+  const rows = d.partners.map(p => `<tr>
+    <td>${esc(p.name)}<div class="lil">${esc(p.district)}, ${esc(p.state)}</div></td>
+    <td>${esc(p.partner_type || p.agency_type)}</td>
+    <td class="r num">${p.cumulative_utilization == null ? "—" : pct(p.cumulative_utilization)}</td>
+    <td class="r num">${p.deployable_headroom_lakh ? rupee(p.deployable_headroom_lakh * 1e5) : "—"}</td>
+    <td class="r num">${p.net_npa_percentage == null ? "—" : p.net_npa_percentage + "%"}</td>
+    <td>${p.utilisation_confidence === "OFFICIAL"
+          ? '<span class="tag official">published</span>'
+          : '<span class="tag mock">representative</span>'}</td></tr>`).join("");
+  document.getElementById("partners").innerHTML = `<table>
+    <thead><tr><th>Agency</th><th>Type</th><th class="r">Allocation used</th>
+      <th class="r">Undeployed</th><th class="r">Net NPA</th><th>Source</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+let corpusLoaded = false;
+async function loadCorpus(){
+  if (corpusLoaded) return; corpusLoaded = true;
+  const d = await (await fetch("/api/schemes")).json();
+  document.getElementById("corpus-note").textContent =
+    `The problem statement names three schemes. NSFDC publishes ${d.schemes.length}, and its own quoted `
+    + `range of 6.5% to 15% is only reachable with all of them. Fetched from `
+    + `${d.provenance.source_url} on ${d.provenance.fetched_at}. Family income ceiling `
+    + `₹${d.income_ceiling.toLocaleString("en-IN")}, effective ${d.income_effective_date}.`;
+  const rows = d.schemes.map(s => {
+    const rates = Object.entries(s.rates)
+      .map(([k, v]) => k === "DEFAULT" ? `${v}%` : `${v}% via ${k.toLowerCase().replace(/_/g," ")}`)
+      .join("<br>");
+    return `<tr><td>${esc(s.name)}<div class="lil">${s.project_types.join(", ")}</div></td>
+      <td class="r num">${s.min_project_cost ? rupee(s.min_project_cost) : "—"}</td>
+      <td class="r num">${s.max_project_cost ? rupee(s.max_project_cost) : "—"}</td>
+      <td class="r num">${rates}</td>
+      <td class="r num">${s.intermediary_rate}%</td>
+      <td class="r num">${s.tenure_months} mo</td>
+      <td class="num">${esc(s.repayment_frequency.toLowerCase())}</td>
+      <td class="r num">${s.moratorium_months} mo</td></tr>`;
+  }).join("");
+  document.getElementById("corpus").innerHTML = `<table>
+    <thead><tr><th>Scheme</th><th class="r">From</th><th class="r">Up to</th>
+      <th class="r">Rate to you</th><th class="r">To partner</th><th class="r">Tenure</th>
+      <th>Repaid</th><th class="r">Grace</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+</script>
+</body>
+</html>

@@ -23,10 +23,11 @@ import time
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from src.config import get_settings
 from src.database import init_database
+from src.api import router as api_router
 from src.webhook import router as webhook_router, set_message_queue
 from src.worker import MessageWorker
 
@@ -99,6 +100,7 @@ app = FastAPI(
 
 # Mount routes
 app.include_router(webhook_router)
+app.include_router(api_router)
 
 
 @app.get("/health")
@@ -111,27 +113,43 @@ async def health_check():
     }
 
 
-@app.get("/")
-async def root():
-    """Root endpoint — basic info."""
+@app.get("/", response_class=HTMLResponse)
+async def portal():
+    """The web portal.
+
+    Served from this same app rather than a separate frontend build: one process,
+    one deploy, no Node toolchain, and nothing extra to go wrong on demo day.
+    (The partner console proper is planned as a separate Next.js app; this is the
+    demo surface.) No webfonts either — the portal has to work offline, for the
+    same reason map tiles are cached locally.
+    """
+    return FileResponse(WEB_DIR / "index.html", media_type="text/html")
+
+
+@app.get("/api-info")
+async def api_info():
+    """What this service is, for anything that pings the old root route."""
     return {
         "name": "Avsarathi.ai",
-        "description": "NSFDC Scheme Matching Platform — SIH26092",
-        "phase": "0 — Webhook/Queue/Worker skeleton",
+        "description": "AI-Driven Scheme Matching for NSFDC Credit Schemes — SIH26092",
+        "portal": "/",
         "health": "/health",
         "webhook": "/webhook/whatsapp",
+        "api": ["/api/recommend", "/api/schemes", "/api/partners"],
     }
+
 
 # ---------------------------------------------------------------------------
 # Rendered partner maps
 #
-# Twilio fetches media_url from the public internet, so a map has to be served
-# on a URL with no auth in front of it. That map encodes a beneficiary's
-# approximate location, which is personal data under DPDP — so this is ONE
-# narrow route with a strict filename pattern, not a StaticFiles mount over a
-# directory. Filenames are unguessable tokens and old files are swept.
+# Twilio fetches media_url from the public internet, so a map has to be served on
+# a URL with no auth in front of it. That map encodes a beneficiary's approximate
+# location, which is personal data under DPDP — so this is ONE narrow route with
+# a strict filename pattern, not a StaticFiles mount over a directory. Filenames
+# are unguessable tokens and old files are swept.
 # ---------------------------------------------------------------------------
 
+WEB_DIR = Path(__file__).resolve().parent / "web"
 MEDIA_DIR = Path("data/maps")
 MEDIA_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{22}\.png$")
 MEDIA_TTL_SECONDS = 3600
