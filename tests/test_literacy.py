@@ -13,6 +13,7 @@ from src.calculator import MoratoriumType, calculate_emi
 from src.config import SCHEMES, get_settings
 from src.literacy import (
     format_fraud_shield,
+    format_scheme_comparison,
     format_instalment,
     format_moneylender_comparison,
     format_moratorium_strip,
@@ -167,3 +168,51 @@ class TestDisclosures:
         assert "40%" in format_priority_note(priority, "female")
         assert format_priority_note(priority, "male") == ""
         assert format_priority_note(None, "female") == ""
+
+
+# ---------------------------------------------------------------------------
+# Scheme comparison — same project, different scheme, different price
+# ---------------------------------------------------------------------------
+
+class TestSchemeComparison:
+    """A ₹1.2L project qualifies for MFS at 6.5% AND Aajeevika at 15%.
+
+    Both published by NSFDC, 8.5 points apart, for the same money. Being routed
+    to the wrong one of two schemes you equally qualify for is a pure, invisible
+    loss — and this is the feature that makes it visible.
+    """
+
+    def _priced(self, project_cost: float):
+        from src.calculator import calculate_emi
+        result = evaluate_eligibility(UserProfile(
+            project_type="business", project_cost=project_cost, annual_income=280_000,
+        ))
+        priced = []
+        for match in result.matches:
+            s = SCHEMES[match.scheme_id]
+            priced.append((match, calculate_emi(
+                project_cost=project_cost, financing_pct=s["financing_pct"],
+                rate_annual=match.rate_min, tenure_months=s["tenure_months"],
+                moratorium_months=s["moratorium_months"],
+                periods_per_year=s["periods_per_year"],
+            )))
+        return priced
+
+    def test_cheapest_scheme_is_named_first(self):
+        out = format_scheme_comparison(self._priced(120_000))
+        assert "Micro Finance Scheme" in out
+        assert "cheapest" in out
+
+    def test_quantifies_the_difference(self):
+        priced = self._priced(120_000)
+        out = format_scheme_comparison(priced)
+        costs = sorted(emi.total_interest for _, emi in priced)
+        assert format_rupees(costs[-1] - costs[0]) in out
+
+    def test_silent_when_only_one_scheme_matches(self):
+        """Never manufacture a comparison out of a single option."""
+        result = evaluate_eligibility(UserProfile(
+            project_type="education", project_cost=500_000, annual_income=280_000,
+        ))
+        assert len(result.matches) == 1
+        assert format_scheme_comparison([]) == ""

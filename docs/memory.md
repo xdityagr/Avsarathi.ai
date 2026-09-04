@@ -4,9 +4,11 @@ Update this at the end of every session, whoever's driving (human or AI agent). 
 ---
 
 ## Last updated
-2026-09-03, PRD v3 + business plan strategy session (Claude Opus 5, Claude Code). No code changes.
+2026-09-04, MVP build session (Claude Opus 5, Claude Code). Branch feat/mvp-corpus-routing. 161 tests passing.
 
 ## Current phase
+**MVP items 1-7 and 9 COMPLETE** on branch `feat/mvp-corpus-routing` (161 tests). Item 8 (maps) outstanding.
+
 **Phase 3 — COMPLETE.** Gemini integration for LLM extraction and generation, coupled with robust SQLite caching based on deterministic outcome fingerprints. 72/72 tests passing.
 
 ## Done
@@ -70,6 +72,18 @@ Nothing in code. Doc suite re-baselined on 2026-09-03 — see `PRD-v3.md` §12 f
 
 ## Session log
 *(Newest first)*
+
+- **2026-09-04 — MVP build (items 1-7, 9).** Claude Opus 5, Claude Code. Branch `feat/mvp-corpus-routing`. 72 -> 161 tests.
+  - **Corpus**: `corpus/v1/schemes.json` is now the single source of truth with per-field provenance; `config.SCHEMES` is a derived view; the dead `schemes` DDL table is deleted. Five schemes, not three.
+  - **Fixed a live bug**: project types lived in a module-level dict and a scheme missing from it matched EVERY project type — Udyam Nidhi (business) was being offered to education applicants the moment the corpus grew. Now corpus-sourced, empty list = load-time error.
+  - **Eligibility**: `EligibilityResult` with matches + rejections (stable `rule` tags) + No-Dead-Ends referral. `evaluate_eligible_schemes()` kept as a wrapper so cache/llm/graph are untouched.
+  - **Calculator**: `periods_per_year` (default 12 so all 23 existing tests pass byte-identically); NSFDC repays QUARTERLY. Integer period math — float division would render "over 78.0 months" live.
+  - **Literacy** (`src/literacy.py`, all deterministic, no LLM): True Cost, quarterly+monthly instalment, moratorium strip, Why/Why-Not, fraud shield, priority note, moneylender comparison, scheme comparison.
+  - **Ingest** (`src/corpus/ingest.py`): real NSFDC data. Tier 3 is no longer mocked. 36 states x 9 FYs, current to 31 Jul 2026; for FY2025-26, 11/36 states meet the 100% SCA norm. Two parser bugs found against the real file (title row contains both header keywords; the sheet stacks several tables with different layouts). Self-consistency guard drops rows where published %AGE disagrees with actual/allocation.
+  - **Routing** (`src/routing.py`): hard exclusions with user-facing reasons; separates fresh-release eligibility from deployable headroom; scores travel/cost/headroom; Cheapest Route silent where no spread is published; disclosure computed per response from row confidence.
+  - **Pitch figures corrected**: the script's Rs 22,300 is not reproducible. Real: Rs 12,568 scheme interest vs Rs 1,78,200 moneylender on Rs 1.08L. And at Rs 1.2L a user matches MFS at 6.5% AND Aajeevika at 15% — Rs 29,389 apart on the same project, which is a stronger Cheapest-Route beat than the partner-type one and needs no story change.
+  - **Environment note**: no venv; running on miniconda base. langgraph, aiosqlite, langchain-google-genai, selectolax were missing and were installed.
+  - **Outstanding**: item 8 (maps -> WhatsApp), then voice (11), console (12, decided as separate Next.js app), Aadhaar verify (13).
 
 - **2026-09-03 — PRD v3 + business plan.** Claude Opus 5, Claude Code. No code. Re-scoped the project from "PS deliverable checklist" to an origination layer. Wrote `PRD-v3.md`, `BUSINESS-PLAN.md`, `data-sources.md`. Key findings: (1) **the scheme numbers had converged all along** — NSFDC runs 5 schemes, not 3, and the PS's own "6.5-15% depending on the scheme" and "3-12 month" ranges only reconcile with all five, so `rules.md`'s five-pass deadlock was a wrong-model problem, not a source-conflict problem; (2) **NSFDC publishes state-wise cumulative funds utilisation as Excel** (to 2026-07-31), so Tier 3 upgrades from mocked to real data; (3) **JanSamarth covers 15 schemes / 269 banks and zero NFDC products** — that is the market gap; (4) **Aadhaar Paperless Offline e-KYC needs no AUA licence**, giving real identity verification inside a hackathon build; (5) AAGG Amendment Rules 2025 permit private Aadhaar auth for "prevention of dissipation of social welfare benefits", sponsored by the ministry — which here is MoSJE, the PS author. Added financial-literacy, faster-disbursement and fund-utilisation feature sets against the PS's two impact goals, which v2 had no features for.
   **Second pass — corpus schema redesign.** The 11-numeric-field scheme schema was too thin; NSFDC's pages carry far more. Redesigned as a **two-plane corpus**: Plane A (typed, deterministic, feeds Tier 1 — never LLM-touched) vs Plane B (narrative: purpose, benefits, process, documents, FAQs — retrievable for Q&A, never decides eligibility), mirroring myScheme's national section taxonomy. New findings from the sub-pages:

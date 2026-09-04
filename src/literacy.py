@@ -153,3 +153,43 @@ def format_priority_note(scheme_priority: dict[str, float] | None, gender: str) 
             f"funds for women applicants._"
         )
     return ""
+
+
+def format_scheme_comparison(
+    priced: list[tuple[SchemeMatch, "EMIResult"]],
+    limit: int = 3,
+) -> str:
+    """Compare the schemes a person qualifies for, by what they actually cost.
+
+    This is the sharpest form the "same project, different price" idea takes,
+    and it needs no partner data at all. A ₹1.2 lakh tailoring unit qualifies for
+    the Micro Finance Scheme at 6.5% AND the Aajeevika Micro-Finance Yojana at
+    15% — the same money, the same project, 8.5 percentage points apart, both
+    published by NSFDC.
+
+    Nobody tells applicants this. Being routed to the wrong one of two schemes
+    you equally qualify for is a pure, invisible loss.
+    """
+    if len(priced) < 2:
+        return ""
+
+    ranked = sorted(priced, key=lambda pair: pair[1].total_interest)
+    cheapest_match, cheapest_emi = ranked[0]
+    dearest_match, dearest_emi = ranked[-1]
+    if dearest_emi.total_interest <= cheapest_emi.total_interest:
+        return ""
+
+    lines = ["*You qualify for more than one — they don't cost the same*"]
+    for match, emi in ranked[:limit]:
+        marker = " ← cheapest" if match.scheme_id == cheapest_match.scheme_id else ""
+        lines.append(
+            f"• {match.name} at {emi.rate_annual:g}%: "
+            f"{_rupees(emi.total_interest)} interest{marker}"
+        )
+
+    difference = dearest_emi.total_interest - cheapest_emi.total_interest
+    lines.append(
+        f"\nChoosing {cheapest_match.name} over {dearest_match.name} saves you "
+        f"*{_rupees(difference)}* on the same project."
+    )
+    return "\n".join(lines)

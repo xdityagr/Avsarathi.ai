@@ -34,9 +34,14 @@ Do not open with the scheme, the ministry, or the tech. Open with her. Everythin
 | 0:30 | **Voice note, in Hindi** | She *speaks* — no typing, no language menu. The reply comes back spoken, in Hindi. Say: *"we never asked her what language she speaks — we detected the script"* |
 | 0:55 | **Intake, buttons not questions** | Cost, income, education status. Four taps. Fast — don't linger |
 | 1:10 | **The Why / Why-Not trail** | *Qualifies* for Micro Finance — here's the arithmetic. Does **not** qualify for Term Loan — **and here's why.** Explaining the rejection is the literacy moment |
-| 1:20 | **True Cost + Moneylender Comparison** | *"This loan costs her ₹22,300. The moneylender would cost ₹1,87,500."* **Stop talking for one beat.** This is the emotional peak of the pitch |
+| 1:20 | **True Cost + Moneylender Comparison** | *"This loan costs her ₹12,568. The same money from a moneylender would cost ₹1,78,200."* **Stop talking for one beat.** This is the emotional peak of the pitch |
 | 1:45 | **Map — and an exclusion** | Nearest partners, on a real map. Then show one that is **excluded**, with the reason: *"this agency hasn't utilised its last release — it cannot disburse right now."* Prudential routing, made visible |
-| 2:10 | **Cheapest Route** | *"This bank is 4 km away at 15%. That one is 11 km away at 13%. Those 7 km save her ₹—."* Nobody tells beneficiaries this |
+| 2:10 | **Cheapest Scheme** | *"She qualifies for three schemes. Micro Finance costs ₹12,568. Udyam Nidhi costs ₹41,957. Same project, same ₹1.08 lakh, ₹29,389 apart — and nobody tells her."* |
+
+> **Every rupee figure above is produced by the code**, not written for the slide. Re-run
+> `format_true_cost` / `format_moneylender_comparison` / `format_scheme_comparison`
+> before the pitch and copy what comes out. An earlier draft of this script quoted
+> ₹22,300, which the calculator does not produce — the script follows the code.
 
 ### 2:30–3:15 · The three reveals
 
@@ -74,7 +79,7 @@ Only what the four minutes needs. Sizes are relative (S ≈ half a day, M ≈ 1�
 | 6 | **Utilisation data ingest** | M | reveal 2 | Download 9 Excel files, parse state-wise utilisation. **Do this early — it de-risks the biggest reveal** |
 | 7 | **Routing + exclusion reasons** | M | 1:45 | Prudential filter must return *why* a partner was excluded, as a sentence |
 | 8 | **Map → WhatsApp** | M | 1:45 | Static OSM render with pins + native location message |
-| 9 | **Cheapest Route** | S | 2:10 | Falls out of #1 + #7 almost free |
+| 9 | **Cheapest Scheme + Cheapest Route** | S | 2:10 | Falls out of #1 + #7 almost free. Note: Sunita at ₹1.2L cannot demo the *partner-type* spread (that needs Udyam Nidhi at ₹1.4-5L), but she matches MFS at 6.5% and Aajeevika at 15% — the same money, 8.5 points apart. Stronger beat, no story change |
 | 10 | **Script detection + Hindi copy** | M | 0:30 | Unicode block lookup + Hindi templates. No model needed for detection |
 | 11 | **Voice in/out (Hindi)** | L | 0:30 | IndicConformer ASR + Indic Parler-TTS. **Highest technical risk — start it first** |
 | 12 | **Partner console — one screen** | M | 3:30 | Read-only queue + prudential status + map. One screen, not an app |
