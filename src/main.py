@@ -113,17 +113,43 @@ async def health_check():
     }
 
 
+ASSET_NAME_RE = re.compile(r"^[a-z0-9_-]+\.(css|js)$")
+ASSET_TYPES = {".css": "text/css", ".js": "text/javascript"}
+
+
 @app.get("/", response_class=HTMLResponse)
-async def portal():
-    """The web portal.
+async def landing():
+    """Landing page.
 
     Served from this same app rather than a separate frontend build: one process,
     one deploy, no Node toolchain, and nothing extra to go wrong on demo day.
-    (The partner console proper is planned as a separate Next.js app; this is the
-    demo surface.) No webfonts either — the portal has to work offline, for the
-    same reason map tiles are cached locally.
+    (The partner console proper is planned as a separate Next.js app.) No
+    webfonts either — the site has to work offline, for the same reason map tiles
+    are cached locally.
     """
-    return FileResponse(WEB_DIR / "index.html", media_type="text/html")
+    return FileResponse(WEB_DIR / "landing.html", media_type="text/html")
+
+
+@app.get("/app", response_class=HTMLResponse)
+async def portal():
+    """The scheme finder itself."""
+    return FileResponse(WEB_DIR / "app.html", media_type="text/html")
+
+
+@app.get("/assets/{filename}")
+async def get_asset(filename: str):
+    """Serve the shared stylesheet and custom-element definitions.
+
+    A named allowlist pattern rather than a StaticFiles mount — same reasoning as
+    /media below: one narrow route is easier to reason about than a directory
+    served wholesale.
+    """
+    if not ASSET_NAME_RE.match(filename):
+        raise HTTPException(status_code=404, detail="Not found")
+    path = (WEB_DIR / filename).resolve()
+    if not path.is_file() or WEB_DIR.resolve() not in path.parents:
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(path, media_type=ASSET_TYPES[path.suffix])
 
 
 @app.get("/api-info")
@@ -132,7 +158,8 @@ async def api_info():
     return {
         "name": "Avsarathi.ai",
         "description": "AI-Driven Scheme Matching for NSFDC Credit Schemes — SIH26092",
-        "portal": "/",
+        "landing": "/",
+        "portal": "/app",
         "health": "/health",
         "webhook": "/webhook/whatsapp",
         "api": ["/api/recommend", "/api/schemes", "/api/partners"],

@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Find a scheme — Avsarathi</title>
+<link rel="stylesheet" href="/assets/av.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-in">
+    <a class="brand" href="/">Avsarathi <em>/ NSFDC</em></a>
+    <a class="lnk" href="/">About</a>
+  </div>
+</nav>
+
+<main class="app">
+  <div class="wrap">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="t-find" aria-selected="true">Find a scheme</button>
+      <button role="tab" id="t-partners" aria-selected="false">Channel partners</button>
+      <button role="tab" id="t-corpus" aria-selected="false">Scheme corpus</button>
+    </div>
+
+    <!-- ============================ FIND ============================ -->
+    <section id="p-find">
+      <form id="intake">
+        <div class="form-grid">
+          <av-field label="Purpose">
+            <select id="ptype">
+              <option value="business">Business or self-employment</option>
+              <option value="education">Education</option>
+            </select>
+          </av-field>
+          <av-field label="What will it cost?">
+            <input id="cost" class="num" type="number" min="0" step="1000" value="120000" required>
+          </av-field>
+          <av-field label="Family income a year">
+            <input id="income" class="num" type="number" min="0" step="1000" value="280000" required>
+          </av-field>
+          <av-field label="Category">
+            <select id="cat">
+              <option>SC</option><option>ST</option><option>OBC</option>
+              <option>MINORITY</option><option>GENERAL</option>
+            </select>
+          </av-field>
+          <av-field label="Applicant">
+            <select id="gender">
+              <option value="female">Woman</option>
+              <option value="male">Man</option>
+              <option value="other">Other</option>
+            </select>
+          </av-field>
+          <av-field label="Education">
+            <select id="edu">
+              <option value="unknown">Not given</option>
+              <option value="below_10th">Below class 10</option>
+              <option value="10th_to_12th">Class 10–12</option>
+              <option value="graduate_plus">Graduate or above</option>
+            </select>
+          </av-field>
+          <av-field label="Where are you?">
+            <select id="where">
+              <option value="25.7585,84.1487|Uttar Pradesh">Ballia, Uttar Pradesh</option>
+              <option value="28.6139,77.2090|Delhi">New Delhi</option>
+              <option value="19.0760,72.8777|Maharashtra">Mumbai, Maharashtra</option>
+              <option value="13.0827,80.2707|Tamil Nadu">Chennai, Tamil Nadu</option>
+              <option value="|">Not given</option>
+            </select>
+          </av-field>
+        </div>
+        <div class="form-actions">
+          <button class="btn" id="go" type="submit">Find schemes</button>
+        </div>
+      </form>
+      <div id="out"></div>
+    </section>
+
+    <!-- ========================== PARTNERS ========================== -->
+    <section id="p-partners" hidden>
+      <p class="lede-note">Every channel partner in the system, with the figure each
+        prudential rule is assessed against. Fund utilisation is NSFDC's own published
+        state-wise data. Branch-level NPAs are representative — no public source
+        publishes them, so the rule is real and the number illustrative.</p>
+      <div id="partners" class="sect scroll-x"></div>
+    </section>
+
+    <!-- =========================== CORPUS =========================== -->
+    <section id="p-corpus" hidden>
+      <p class="lede-note" id="corpus-note"></p>
+      <div id="corpus" class="sect scroll-x"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import { rupee, pct, esc, plain } from "/assets/av.js";
+
+const $ = id => document.getElementById(id);
+
+/* ------------------------------------------------------------- tabs */
+const TABS = ["find", "partners", "corpus"];
+function show(tab){
+  for (const t of TABS){
+    $("p-" + t).hidden = (t !== tab);
+    $("t-" + t).setAttribute("aria-selected", String(t === tab));
+  }
+  history.replaceState(null, "", tab === "find" ? "/app" : "#" + tab);
+  if (tab === "partners") loadPartners();
+  if (tab === "corpus") loadCorpus();
+}
+TABS.forEach(t => $("t-" + t).addEventListener("click", () => show(t)));
+if (location.hash) show(location.hash.slice(1));
+
+/* ---------------------------------------------------------- helpers */
+function section(title, node){
+  const wrap = document.createElement("section");
+  wrap.className = "sect";
+  const h = document.createElement("div");
+  h.className = "sect-h";
+  h.textContent = title;
+  wrap.append(h, node);
+  return wrap;
+}
+const div = (cls, html) => {
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  if (html != null) d.innerHTML = html;
+  return d;
+};
+
+/* ------------------------------------------------------ find flow */
+$("intake").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = $("go");
+  btn.disabled = true; btn.textContent = "Checking…";
+  const [coords, state] = ($("where").value || "|").split("|");
+  const [lat, lon] = (coords || ",").split(",");
+  try {
+    const res = await fetch("/api/recommend", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_type: $("ptype").value,
+        project_cost: +$("cost").value,
+        annual_income: +$("income").value,
+        category: $("cat").value,
+        gender: $("gender").value,
+        education_status: $("edu").value,
+        latitude: lat ? +lat : null,
+        longitude: lon ? +lon : null,
+        state: state || null,
+      }),
+    });
+    if (!res.ok) throw new Error("the server returned " + res.status);
+    render(await res.json());
+    $("out").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (err) {
+    $("out").replaceChildren(div("sect empty",
+      `Couldn't reach the scheme engine — ${esc(err.message)}. Check the server is running.`));
+  } finally { btn.disabled = false; btn.textContent = "Find schemes"; }
+});
+
+/* Informal-lender cost, mirroring src/literacy.py so the bar matches the copy. */
+const informalCost = s => s.loan_amount * 0.05 * (s.instalment_count * 3);
+
+function render(d){
+  const out = $("out");
+  out.replaceChildren();
+
+  if (!d.eligible){
+    const box = div("sect empty");
+    box.append(Object.assign(document.createElement("h3"),
+      { textContent: "No NSFDC scheme fits this profile" }));
+    if (d.category_note) box.append(div("p-meta", esc(d.category_note)));
+    out.append(box);
+    if (d.rejections.length) out.append(section("Not a match, and why", rejections(d)));
+    return;
+  }
+
+  const best = d.schemes[0];
+
+  const compare = document.createElement("av-cost-compare");
+  compare.classList.add("sect");
+  compare.data = {
+    loan: best.loan_amount,
+    schemeLabel: `${best.name}, ${best.rate}% a year`,
+    schemeAmount: best.total_interest,
+    altLabel: "A local moneylender at 5% a month",
+    altAmount: informalCost(best),
+    foot: `Over the same ${best.instalment_count} instalments, assuming interest paid `
+        + `monthly and the principal repaid at the end — the usual local arrangement.`,
+  };
+  out.append(compare);
+
+  const list = div("");
+  d.schemes.forEach((s, i) => {
+    const row = document.createElement("av-scheme");
+    row.data = { ...s, best: i === 0, total: d.schemes.length };
+    list.append(row);
+  });
+  out.append(section("What you qualify for", list));
+
+  if (d.scheme_comparison){
+    const n = document.createElement("av-notice");
+    n.setAttribute("tone", "accent");
+    n.textContent = plain(d.scheme_comparison).replace(/\n+/g, " ").replace(/•/g, "·");
+    out.append(section("Same project, different price", n));
+  }
+
+  if (d.rejections.length) out.append(section("Not a match, and why", rejections(d)));
+
+  const two = div("two");
+  const left = div("");
+
+  if (d.partners.length){
+    const plist = div("");
+    d.partners.forEach((p, i) => {
+      const row = document.createElement("av-partner");
+      row.data = { ...p, rank: i + 1 };
+      plist.append(row);
+    });
+    left.append(section("Where to go", plist));
+  } else {
+    left.append(section("Where to go",
+      div("empty", "No partner within range can process this scheme yet.")));
+  }
+
+  if (d.excluded_partners.length){
+    const ex = div("");
+    d.excluded_partners.forEach(e => {
+      const b = div("blocked");
+      b.style.marginBottom = "18px";
+      b.append(div("b-name", esc(e.name)), div("b-why", esc(e.reason)));
+      ex.append(b);
+    });
+    left.append(section("Cannot help you right now", ex));
+  }
+  if (d.routing_disclosure)
+    left.append(div("p-meta", esc(d.routing_disclosure)));
+
+  const right = div("");
+  if (d.map_url){
+    right.append(section("Nearest partners",
+      div("", `<img class="map" alt="Map showing the nearest channel partners" src="${esc(d.map_url)}">`)));
+  }
+  const shield = document.createElement("av-notice");
+  shield.setAttribute("tone", "alert");
+  shield.setAttribute("heading", "NSFDC never charges a fee to apply");
+  shield.textContent = "If anyone asks you for money to process or approve your loan, "
+    + "that is fraud. You can apply yourself, free, through a channel partner.";
+  right.append(section("Before you go", shield));
+
+  two.append(left, right);
+  out.append(two);
+}
+
+function rejections(d){
+  const wrap = div("");
+  d.rejections.forEach(r => {
+    const b = div("blocked");
+    b.style.marginBottom = "18px";
+    b.append(div("b-name", esc(r.name)), div("b-why", esc(r.reason)));
+    wrap.append(b);
+  });
+  return wrap;
+}
+
+/* ----------------------------------------------------- partners tab */
+let partnersLoaded = false;
+async function loadPartners(){
+  if (partnersLoaded) return; partnersLoaded = true;
+  const d = await (await fetch("/api/partners")).json();
+  const rows = d.partners.map(p => `<tr>
+    <td>${esc(p.name)}<div class="t-sub">${esc(p.district)}, ${esc(p.state)}</div></td>
+    <td>${esc(p.partner_type || p.agency_type)}</td>
+    <td class="r num">${p.cumulative_utilization == null ? "—" : pct(p.cumulative_utilization)}</td>
+    <td class="r num">${p.deployable_headroom_lakh ? rupee(p.deployable_headroom_lakh * 1e5) : "—"}</td>
+    <td class="r num">${p.net_npa_percentage == null ? "—" : p.net_npa_percentage + "%"}</td>
+    <td class="r">${p.utilisation_confidence === "OFFICIAL"
+      ? '<av-tag tone="accent">published</av-tag>'
+      : '<av-tag tone="quiet">representative</av-tag>'}</td></tr>`).join("");
+  $("partners").innerHTML = `<table>
+    <thead><tr><th>Agency</th><th>Type</th><th class="r">Allocation used</th>
+      <th class="r">Undeployed</th><th class="r">Net NPA</th><th class="r">Source</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+/* ------------------------------------------------------- corpus tab */
+let corpusLoaded = false;
+async function loadCorpus(){
+  if (corpusLoaded) return; corpusLoaded = true;
+  const d = await (await fetch("/api/schemes")).json();
+  $("corpus-note").textContent =
+    `The problem statement names three schemes. NSFDC publishes ${d.schemes.length}, and its `
+    + `own quoted range of 6.5% to 15% is only reachable with all of them. Read from `
+    + `${d.provenance.source_url} on ${d.provenance.fetched_at}. Family income ceiling `
+    + `₹${d.income_ceiling.toLocaleString("en-IN")}, effective ${d.income_effective_date}.`;
+  const rows = d.schemes.map(s => {
+    const rates = Object.entries(s.rates)
+      .map(([k, v]) => k === "DEFAULT" ? `${v}%`
+        : `${v}% <span class="t-sub">via ${esc(k.toLowerCase().replace(/_/g, " "))}</span>`)
+      .join("<br>");
+    return `<tr>
+      <td>${esc(s.name)}<div class="t-sub">${esc(s.project_types.join(", "))}</div></td>
+      <td class="r num">${s.min_project_cost ? rupee(s.min_project_cost) : "—"}</td>
+      <td class="r num">${s.max_project_cost ? rupee(s.max_project_cost) : "—"}</td>
+      <td class="r num">${rates}</td>
+      <td class="r num">${s.intermediary_rate}%</td>
+      <td class="r num">${s.tenure_months} mo</td>
+      <td class="r">${esc(s.repayment_frequency.toLowerCase())}</td>
+      <td class="r num">${s.moratorium_months} mo</td></tr>`;
+  }).join("");
+  $("corpus").innerHTML = `<table>
+    <thead><tr><th>Scheme</th><th class="r">From</th><th class="r">Up to</th>
+      <th class="r">Rate to you</th><th class="r">To partner</th><th class="r">Tenure</th>
+      <th class="r">Repaid</th><th class="r">Grace</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+</script>
+</body>
+</html>
