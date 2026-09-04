@@ -189,3 +189,52 @@ async def send_whatsapp_buttons(
             return False
 
     return False
+
+
+async def send_whatsapp_media(
+    to: str,
+    media_url: str,
+    body: str = "",
+    max_retries: int = 3,
+) -> bool:
+    """Send an image (a rendered partner map) with an optional caption.
+
+    Twilio fetches `media_url` itself from the public internet, so it must be a
+    reachable HTTPS URL — which is why main.py serves rendered maps on a narrow
+    route rather than keeping them local. That also means the URL is public and
+    unauthenticated while it lives, and it encodes a beneficiary's approximate
+    location, so the filename is an unguessable token and the file is swept.
+
+    Falls back to plain text if the media send fails: a map is an enhancement,
+    and the partner list underneath it is the actual answer.
+    """
+    settings = get_settings()
+    client = _get_client()
+
+    for attempt in range(max_retries):
+        try:
+            message = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: client.messages.create(
+                    body=body,
+                    media_url=[media_url],
+                    from_=settings.twilio_whatsapp_number,
+                    to=to,
+                ),
+            )
+            logger.info("WhatsApp media sent: SID=%s, to=%s", message.sid, to[:15] + "...")
+            return True
+
+        except TwilioRestException as e:
+            logger.error("Twilio media error (attempt %d/%d): %s", attempt + 1, max_retries, e)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)
+            else:
+                logger.warning("Media send failed; falling back to text for %s", to[:15] + "...")
+                return await send_whatsapp_message(to=to, body=body) if body else False
+
+        except Exception as e:
+            logger.error("Unexpected error sending media: %s", e, exc_info=True)
+            return False
+
+    return False
