@@ -39,6 +39,8 @@ from src.routing import (
     utilisation_note,
 )
 from src.schemes import UserProfile, evaluate_eligibility, notable_rejections
+from src.chat import turn as chat_turn
+from src.i18n import LANGUAGES, ui_strings
 from src.seed import partners_near
 from src.verification import (
     ProofGrade,
@@ -53,6 +55,13 @@ router = APIRouter(prefix="/api", tags=["portal"])
 
 MEDIA_DIR = Path("data/maps")
 TILE_CACHE_DIR = Path("data/tiles")
+
+
+class ChatRequest(BaseModel):
+    session_id: Optional[str] = None
+    message: str = ""
+    language: Optional[str] = None
+    restart: bool = False
 
 
 class VerifyRequest(BaseModel):
@@ -304,3 +313,27 @@ async def verify_identity(request: VerifyRequest) -> dict:
         "state": kyc.state if kyc else "",
         "aadhaar_last4": kyc.aadhaar_last4 if kyc else "",
     }
+
+
+@router.post("/chat")
+async def chat(request: ChatRequest) -> dict:
+    """One conversational turn.
+
+    Same engine as WhatsApp, different presentation: this returns structured
+    cards the browser can render as components, instead of the formatted text
+    block WhatsApp is limited to.
+    """
+    return await chat_turn(
+        session_id=request.session_id,
+        message=request.message,
+        language=request.language,
+        restart=request.restart,
+    )
+
+
+@router.get("/i18n/{lang}")
+async def translations(lang: str) -> dict:
+    """The full string catalogue in one language, plus the language list."""
+    if lang not in LANGUAGES:
+        lang = "en"
+    return {"language": lang, "languages": LANGUAGES, "strings": ui_strings(lang)}
