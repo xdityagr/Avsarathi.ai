@@ -14,7 +14,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from pydantic import BaseModel, Field
 
 from src.config import get_settings
-from src.schemes import SchemeMatch, UserProfile
+from src.schemes import SchemeMatch, UserProfile, format_rupees
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +84,24 @@ async def generate_recommendation_template(matches: list[SchemeMatch], language:
             return "Based on what you shared, I couldn't find an exact match among the schemes I currently cover. Would you like me to share what I do cover, or connect you to a human contact?"
         match = matches[0]
         if match.scheme_id == "MICRO_FINANCE":
-            return "Based on what you shared, you're likely eligible for the **Micro Finance Scheme** — for projects up to ₹1.40 lakh. NSFDC can finance up to 90% of your ₹{project_cost} project. Estimated rate: {rate}% per year, with a {moratorium} month grace period before repayments start. Want your estimated monthly payment, or the nearest place to apply?"
+            return "Based on what you shared, you're likely eligible for the *Micro Finance Scheme* — for projects up to ₹1.40 lakh. NSFDC can finance up to 90% of your ₹{project_cost} project. Estimated rate: {rate}% per year, with a {moratorium} month grace period before repayments start. Here's what it costs and where to go."
         elif match.scheme_id == "TERM_LOAN":
-            return "Based on what you shared, you're likely eligible for a **Term Loan** — for larger projects up to ₹50 lakh. Estimated rate: {rate}% per year on ₹{project_cost}, moratorium {moratorium} months. Want your estimated monthly payment, or the nearest place to apply?"
+            return "Based on what you shared, you're likely eligible for a *Term Loan* — for larger projects up to ₹50 lakh. Estimated rate: {rate}% per year on ₹{project_cost}, moratorium {moratorium} months. Here's what it costs and where to go."
         elif match.scheme_id == "EDUCATIONAL_LOAN":
-            return "Based on what you shared, you're likely eligible for the **Educational Loan Scheme** for your course. NSFDC can cover up to 90% of the cost. {women_rebate_note} Want your estimated monthly payment, or the nearest place to apply?"
-        return "You are eligible for {scheme_name}. Estimated rate: {rate}%."
+            return "Based on what you shared, you're likely eligible for the *Educational Loan Scheme* for your course. NSFDC can cover up to 90% of the cost. {women_rebate_note} Here's what it costs and where to go."
+        elif match.scheme_id == "AAJEEVIKA_MICRO_FINANCE":
+            return ("Based on what you shared, you're likely eligible for the "
+                    "*Aajeevika Micro-Finance Yojana* — for projects up to ₹1.40 lakh, "
+                    "through an NBFC-MFI. Estimated rate: {rate}% per year on ₹{project_cost}, "
+                    "with a {moratorium} month grace period. Here's what it costs and where to go.")
+        elif match.scheme_id == "UDYAM_NIDHI":
+            return ("Based on what you shared, you're likely eligible for the "
+                    "*Udyam Nidhi Yojana* — for projects up to ₹5 lakh. Estimated rate: "
+                    "{rate}% per year on ₹{project_cost}, with a {moratorium} month grace "
+                    "period. Here's what it costs and where to go.")
+        return ("Based on what you shared, you're likely eligible for {scheme_name}. "
+                "Estimated rate: {rate}% per year on ₹{project_cost}. "
+                "Here's what it costs and where to go.")
 
     try:
         llm = ChatGoogleGenerativeAI(
@@ -109,13 +121,13 @@ async def generate_recommendation_template(matches: list[SchemeMatch], language:
         else:
             match = matches[0]
             if match.scheme_id == "MICRO_FINANCE":
-                base = "Based on what you shared, you're likely eligible for the **Micro Finance Scheme** — for projects up to ₹1.40 lakh. NSFDC can finance up to 90% of your ₹{project_cost} project. Estimated rate: {rate}% per year, with a {moratorium} month grace period before repayments start. Want your estimated monthly payment, or the nearest place to apply?"
+                base = "Based on what you shared, you're likely eligible for the *Micro Finance Scheme* — for projects up to ₹1.40 lakh. NSFDC can finance up to 90% of your ₹{project_cost} project. Estimated rate: {rate}% per year, with a {moratorium} month grace period before repayments start. Here's what it costs and where to go."
             elif match.scheme_id == "TERM_LOAN":
-                base = "Based on what you shared, you're likely eligible for a **Term Loan** — for larger projects up to ₹50 lakh. Estimated rate: {rate}% per year on ₹{project_cost}, moratorium {moratorium} months. Want your estimated monthly payment, or the nearest place to apply?"
+                base = "Based on what you shared, you're likely eligible for a *Term Loan* — for larger projects up to ₹50 lakh. Estimated rate: {rate}% per year on ₹{project_cost}, moratorium {moratorium} months. Here's what it costs and where to go."
             elif match.scheme_id == "EDUCATIONAL_LOAN":
-                base = "Based on what you shared, you're likely eligible for the **Educational Loan Scheme** for your course. NSFDC can cover up to 90% of the cost. {women_rebate_note} Want your estimated monthly payment, or the nearest place to apply?"
+                base = "Based on what you shared, you're likely eligible for the *Educational Loan Scheme* for your course. NSFDC can cover up to 90% of the cost. {women_rebate_note} Here's what it costs and where to go."
             else:
-                base = "You are eligible for {scheme_name}. Estimated rate: {rate}% per year, with a {moratorium} month grace period. Want your estimated monthly payment, or the nearest place to apply?"
+                base = "You are eligible for {scheme_name}. Estimated rate: {rate}% per year, with a {moratorium} month grace period. Here's what it costs and where to go."
             
             prompt = (
                 f"Translate the following response template to {language}. "
@@ -146,10 +158,18 @@ def format_recommendation(template: str, profile: UserProfile, matches: list[Sch
     if match.women_rebate_pct > 0 and profile.gender == "female":
         women_rebate_note = f"Since you are a female applicant, a {match.women_rebate_pct}% interest rebate applies. "
 
+    # Every number here must agree with the deterministic block rendered under
+    # it. Before this, the intro quoted the GLOBAL 6-month default while the
+    # block below said 3, and quoted rate_max while the EMI used rate_min — so a
+    # single message contradicted itself twice.
+    effective_rate = match.rate_min
+    if match.women_rebate_pct > 0 and profile.gender == "female":
+        effective_rate = max(0.0, effective_rate - match.women_rebate_pct)
+
     return template.format(
-        project_cost=f"{profile.project_cost:,.0f}",
-        rate=match.rate_max if match.women_rebate_pct == 0 else (match.rate_max - match.women_rebate_pct),
-        moratorium=get_settings().default_moratorium_months,
+        project_cost=format_rupees(profile.project_cost).lstrip("₹"),
+        rate=round(effective_rate, 2),
+        moratorium=match.moratorium_months,
         women_rebate_note=women_rebate_note,
         scheme_name=match.name,
     )

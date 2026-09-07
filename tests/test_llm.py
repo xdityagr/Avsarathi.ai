@@ -88,9 +88,12 @@ def test_format_recommendation():
     
     result = format_recommendation(template, profile, matches)
     
-    # 150000 -> 150,000
-    assert "₹150,000" in result
-    # rate_max 15.0 - rebate 0.5 = 14.5
-    assert "14.5%" in result
+    # Indian digit grouping: 1,50,000 — not 150,000 (schemes.format_rupees)
+    assert "₹1,50,000" in result
+    # The intro must quote the SAME rate the EMI is computed at. It used to use
+    # rate_max while the calculator used rate_min, so a Term Loan message said
+    # "15%" above an EMI calculated at 6.5%. Now: rate_min 6.5 - rebate 0.5 = 6.0.
+    assert "6.0%" in result
+    assert "14.5%" not in result, "rate_max must not leak into the intro"
     # Settings default is 6
     assert "6" in result
