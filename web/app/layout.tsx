@@ -5,11 +5,13 @@ import { ChatLauncher } from "@/components/chat-launcher";
 import { HideOnAppSurfaces } from "@/components/chrome-slot";
 import { LanguageProvider } from "@/components/language-provider";
 import { LanguageSuggestion } from "@/components/language-suggestion";
+import { LocationGate } from "@/components/location-gate";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Toaster } from "@/components/ui/sonner";
 import { dirFor } from "@/lib/i18n/config";
 import { getLang } from "@/lib/i18n/server";
+import { getCatalogMeta } from "@/lib/api";
 import "./globals.css";
 
 /*
@@ -57,7 +59,10 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const lang = await getLang();
+  const [lang, meta] = await Promise.all([getLang(), getCatalogMeta()]);
+  const states = meta.states
+    .map((s) => s.name)
+    .filter((name) => name !== "All");
   // Urdu is right-to-left. Setting it here flips the whole layout —
   // padding, flex order, text alignment — because Tailwind's logical
   // properties follow the document direction.
@@ -78,6 +83,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           </HideOnAppSurfaces>
           <ChatLauncher />
           <LanguageSuggestion />
+          <LocationGate states={states} />
           <Toaster position="top-center" />
         </LanguageProvider>
       </body>

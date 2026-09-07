@@ -10,10 +10,14 @@ import {
   FileText,
   Info,
   Loader2,
+  BadgeCheck,
+  BarChart3,
+  CircleHelp,
   MapPin,
   RotateCcw,
   Search,
   Sparkles,
+  XCircle,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
@@ -44,10 +48,13 @@ interface Turn {
 }
 
 const TOOL_ICONS: Record<string, typeof Search> = {
-  find_schemes: Search,
+  find_schemes: Sparkles,
+  search_schemes: Search,
+  lookup_scheme: FileText,
+  check_scheme_eligibility: BadgeCheck,
   price_loan: Calculator,
   find_offices: MapPin,
-  lookup_scheme: FileText,
+  corpus_stats: BarChart3,
 };
 
 export function ChatPanel({ className }: { className?: string }) {
@@ -267,7 +274,7 @@ export function ChatPanel({ className }: { className?: string }) {
               value={draft}
               disabled={busy}
               aria-label={t("chat.placeholder")}
-              placeholder={t("chat.placeholder")}
+              placeholder={t(agentic ? "chat.placeholder.open" : "chat.placeholder")}
               onChange={(event) => {
                 setDraft(event.target.value);
                 const el = event.target;
@@ -454,6 +461,109 @@ function CardView({
               </li>
             ))}
           </ul>
+        </div>
+      );
+    }
+
+    case "scheme_list": {
+      const items = (card.items ?? []) as {
+        name: string; slug: string; state: string | null;
+        categories: string[]; brief: string;
+      }[];
+      return (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            {(card.total as number)?.toLocaleString("en-IN")} found
+            {s("title") ? ` · ${s("title")}` : ""}
+          </p>
+          <ul className="mt-3 divide-y divide-border">
+            {items.map((item) => (
+              <li key={item.slug} className="py-2.5 first:pt-0 last:pb-0">
+                <Link
+                  href={`/schemes/${item.slug}`}
+                  className="text-sm font-medium hover:text-primary"
+                >
+                  {item.name}
+                </Link>
+                {item.brief ? (
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                    {item.brief}
+                  </p>
+                ) : null}
+                {item.state && item.state !== "All" ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">{item.state}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+
+    case "eligibility": {
+      const verdict = String(card.verdict);
+      const meets = (card.meets ?? []) as string[];
+      const unknown = (card.unknown ?? []) as string[];
+      const unmet = (card.unmet ?? []) as string[];
+      const blocked = verdict === "NOT_MATCHED";
+
+      return (
+        <div
+          className={cn(
+            "rounded-xl border bg-card p-4",
+            blocked ? "border-caution/40" : "border-verified/40",
+          )}
+        >
+          <div className="flex items-start gap-2.5">
+            {blocked ? (
+              <XCircle className="mt-0.5 size-4 shrink-0 text-caution" />
+            ) : (
+              <BadgeCheck className="mt-0.5 size-4 shrink-0 text-verified" />
+            )}
+            <div className="min-w-0">
+              <Link
+                href={`/schemes/${s("slug")}`}
+                className="font-semibold leading-snug hover:text-primary"
+              >
+                {s("name")}
+              </Link>
+              <p
+                className={cn(
+                  "mt-0.5 text-sm font-medium",
+                  blocked ? "text-caution" : "text-verified",
+                )}
+              >
+                {blocked
+                  ? tr("results.notMatchedOn") + " " + unmet.join(", ")
+                  : tr(`results.strength.${verdict === "CHECK" ? "check" : "likely"}`)}
+              </p>
+            </div>
+          </div>
+
+          {/* Every published condition, and where this person stands on each —
+              the thing a counter will actually turn them away over. */}
+          <dl className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs">
+            {meets.map((item) => (
+              <div key={item} className="flex items-center gap-2">
+                <BadgeCheck className="size-3.5 shrink-0 text-verified" />
+                <dt className="text-muted-foreground">{item}</dt>
+              </div>
+            ))}
+            {unmet.map((item) => (
+              <div key={item} className="flex items-center gap-2">
+                <XCircle className="size-3.5 shrink-0 text-caution" />
+                <dt className="font-medium text-caution">{item}</dt>
+              </div>
+            ))}
+            {unknown.map((item) => (
+              <div key={item} className="flex items-center gap-2">
+                <CircleHelp className="size-3.5 shrink-0 text-gold-ink" />
+                <dt className="text-muted-foreground">
+                  {item} — {tr("results.stillToCheck").toLowerCase()}
+                </dt>
+              </div>
+            ))}
+          </dl>
         </div>
       );
     }

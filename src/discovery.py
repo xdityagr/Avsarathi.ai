@@ -371,6 +371,25 @@ def score(match: DiscoveryMatch, facets: Facets) -> float:
 # Discovery
 # ---------------------------------------------------------------------------
 
+def _wanted_values(facets: Facets) -> tuple[dict, dict]:
+    """The person's answers, in the corpus's exact vocabulary."""
+    wanted = {
+        "caste": _label(CASTE_LABELS, facets.caste),
+        "gender": _label(GENDER_LABELS, facets.gender),
+        "residence": _label(RESIDENCE_LABELS, facets.residence),
+        "occupation": _label({}, facets.occupation),
+        "employmentStatus": _label(EMPLOYMENT_LABELS, facets.employment_status),
+        "maritalStatus": _label(MARITAL_LABELS, facets.marital_status),
+    }
+    flags = {
+        "isBpl": facets.is_bpl, "disability": facets.disability,
+        "isStudent": facets.is_student, "minority": facets.minority,
+        "isEconomicDistress": facets.is_economic_distress,
+        "isGovEmployee": facets.is_gov_employee,
+    }
+    return wanted, flags
+
+
 def _row_to_match(row: sqlite3.Row) -> DiscoveryMatch:
     return DiscoveryMatch(
         scheme_uid=f"MYS:{row['slug']}",
@@ -415,20 +434,7 @@ def discover(
     result.total_considered = len(rows)
 
     # Translate once, not 4,736 times.
-    wanted = {
-        "caste": _label(CASTE_LABELS, facets.caste),
-        "gender": _label(GENDER_LABELS, facets.gender),
-        "residence": _label(RESIDENCE_LABELS, facets.residence),
-        "occupation": _label({}, facets.occupation),
-        "employmentStatus": _label(EMPLOYMENT_LABELS, facets.employment_status),
-        "maritalStatus": _label(MARITAL_LABELS, facets.marital_status),
-    }
-    flags = {
-        "isBpl": facets.is_bpl, "disability": facets.disability,
-        "isStudent": facets.is_student, "minority": facets.minority,
-        "isEconomicDistress": facets.is_economic_distress,
-        "isGovEmployee": facets.is_gov_employee,
-    }
+    wanted, flags = _wanted_values(facets)
 
     for row in rows:
         if facets.categories:
@@ -487,6 +493,72 @@ def discover(
     result.matches = result.matches[:limit]
     result.not_matched = result.not_matched[:10]
     return result
+
+
+def evaluate_scheme(
+    slug: str,
+    facets: Facets,
+    corpus_path: Path = CORPUS_PATH,
+) -> Optional[DiscoveryMatch]:
+    """One named scheme, checked criterion by criterion.
+
+    `discover` answers "what might I get?"; this answers "do I qualify for this
+    particular one, and which condition is the problem?" — which is the question
+    someone asks once they have a scheme name in hand, and the one a counter
+    will turn them away over.
+
+    Same rules as everywhere else: a criterion the person has not answered is
+    reported as unknown, never as a failure.
+    """
+    conn = open_corpus(corpus_path)
+    if conn is None:
+        return None
+    try:
+        row = conn.execute(
+            """SELECT s.slug, s.name, s.level, s.state, s.categories, s.brief,
+                      s.eligibility_md,
+                      e.family_income_min, e.family_income_max,
+                      e.age_min, e.age_max
+               FROM schemes s
+               LEFT JOIN scheme_eligibility e ON e.slug = s.slug
+               WHERE s.slug = ?""",
+            (slug,),
+        ).fetchone()
+        if row is None:
+            return None
+        index = _load_facet_index(conn)
+    finally:
+        conn.close()
+
+    match = _row_to_match(row)
+    scheme_facets = index.get(slug, {})
+    wanted, flags = _wanted_values(facets)
+
+    checks = [
+        _check_facet(scheme_facets.get(ident), value, _FACET_LABELS[ident], match)
+        for ident, value in wanted.items()
+    ]
+    checks += [
+        _check_flag_facet(scheme_facets.get(ident), value, _FLAG_FACETS[ident], match)
+        for ident, value in flags.items()
+    ]
+    checks += [
+        _check_income(row, facets.family_income, match),
+        _check_age(row, facets.age, match),
+    ]
+    if row["state"] and facets.state and row["state"].strip().lower() not in ("all", ""):
+        if row["state"].strip().lower() != facets.state.strip().lower():
+            match.unmet.append("state")
+            checks.append(False)
+        else:
+            match.matched_on.append("state")
+
+    if all(checks):
+        match.strength = MatchStrength.CHECK if match.unknown else MatchStrength.LIKELY
+    else:
+        match.strength = MatchStrength.NOT_MATCHED
+    match.relevance = score(match, facets)
+    return match
 
 
 def discover_with_credit(

@@ -556,4 +556,6 @@ async def ask_agent(request: AgentRequest) -> dict:
             for call in reply.trace
         ],
         "used_model": reply.used_model,
+        "model": reply.model,
+        "quota_exhausted": reply.quota_exhausted,
     }

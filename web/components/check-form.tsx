@@ -27,14 +27,19 @@ import { cn } from "@/lib/utils";
 
 export function CheckForm({
   meta,
+  initialState,
   className,
 }: {
   meta: CatalogMeta;
+  /** Remembered from the location question, so it is not asked twice. */
+  initialState?: string | null;
   className?: string;
 }) {
   const { t } = useLanguage();
   const router = useRouter();
-  const [answers, setAnswers] = useState<Answers>({});
+  const [answers, setAnswers] = useState<Answers>(
+    initialState ? { state: initialState } : {},
+  );
   const [matched, setMatched] = useState<number | null>(null);
   const [targeted, setTargeted] = useState(0);
   const [counting, setCounting] = useState(false);

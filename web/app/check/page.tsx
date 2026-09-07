@@ -1,6 +1,6 @@
 import { CheckForm } from "@/components/check-form";
 import { getCatalogMeta } from "@/lib/api";
-import { getT } from "@/lib/i18n/server";
+import { getPlace, getT } from "@/lib/i18n/server";
 
 export const metadata = {
   title: "Check what you qualify for",
@@ -10,7 +10,9 @@ export const metadata = {
 };
 
 export default async function CheckPage() {
-  const [meta, t] = await Promise.all([getCatalogMeta(), getT()]);
+  const [meta, t, place] = await Promise.all([
+    getCatalogMeta(), getT(), getPlace(),
+  ]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
@@ -23,7 +25,7 @@ export default async function CheckPage() {
         </p>
       </header>
 
-      <CheckForm meta={meta} className="mt-10" />
+      <CheckForm meta={meta} initialState={place} className="mt-10" />
     </div>
   );
 }
