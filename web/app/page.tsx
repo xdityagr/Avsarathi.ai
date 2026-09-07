@@ -82,7 +82,7 @@ export default async function HomePage() {
               </p>
             </div>
 
-            <MatchPreview />
+            <MatchPreview t={t} />
           </div>
         </div>
       </section>
@@ -210,7 +210,7 @@ export default async function HomePage() {
  * verdict, the reason for it, and the money — before anyone has typed anything.
  * The figures are the ones the engine actually produces for this profile.
  */
-function MatchPreview() {
+function MatchPreview({ t }: { t: ReturnType<typeof translator> }) {
   return (
     <div className="card-quiet overflow-hidden">
       <div className="flex items-center justify-between border-b border-border bg-muted/60 px-5 py-3">
@@ -218,7 +218,7 @@ function MatchPreview() {
           Sunita · Ballia, UP · SC · ₹2.8L
         </p>
         <span className="rounded-full bg-verified-soft px-2.5 py-1 text-xs font-semibold text-verified">
-          3 matches
+          {t("home.preview.matches")}
         </span>
       </div>
 
@@ -227,19 +227,19 @@ function MatchPreview() {
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold leading-snug">Micro Finance Scheme</h3>
             <span className="shrink-0 rounded-md bg-gold-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gold-ink">
-              Cheapest
+              {t("home.preview.cheapest")}
             </span>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            ₹1,20,000 at 6% · quarterly repayment
+            {t("home.preview.terms")}
           </p>
           <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg bg-muted/60 px-3 py-2">
-              <dt className="text-xs text-muted-foreground">You repay each quarter</dt>
+              <dt className="text-xs text-muted-foreground">{t("home.preview.perQuarter")}</dt>
               <dd className="mt-0.5 font-semibold tabular-nums">₹12,568</dd>
             </div>
             <div className="rounded-lg bg-muted/60 px-3 py-2">
-              <dt className="text-xs text-muted-foreground">Interest, in total</dt>
+              <dt className="text-xs text-muted-foreground">{t("home.preview.interest")}</dt>
               <dd className="mt-0.5 font-semibold tabular-nums">₹17,272</dd>
             </div>
           </dl>
@@ -247,22 +247,22 @@ function MatchPreview() {
 
         <div className="bg-caution-soft px-5 py-4">
           <p className="text-sm font-semibold text-caution">
-            A moneylender at 60% would take ₹1,08,000 in interest
+            {t("home.preview.moneylender")}
           </p>
           <p className="mt-1 text-sm text-caution/90">
-            Six times more, for the same ₹1,20,000.
+            {t("home.preview.sixTimes")}
           </p>
         </div>
 
         <div className="px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Where to go
+            {t("home.preview.whereToGo")}
           </p>
           <p className="mt-2 text-sm font-medium">
             UP Scheduled Castes Finance &amp; Development Corporation
           </p>
           <p className="text-sm text-muted-foreground">
-            Ballia district office · 4.2 km · funds fully deployed last year
+            {t("home.preview.office")}
           </p>
         </div>
       </div>

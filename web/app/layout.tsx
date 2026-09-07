@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 
 import { ChatLauncher } from "@/components/chat-launcher";
+import { HideOnAppSurfaces } from "@/components/chrome-slot";
 import { LanguageProvider } from "@/components/language-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -65,7 +66,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <LanguageProvider lang={lang}>
           <SiteHeader />
           <main className="flex-1">{children}</main>
-          <SiteFooter />
+          <HideOnAppSurfaces>
+            <SiteFooter />
+          </HideOnAppSurfaces>
           <ChatLauncher />
           <Toaster position="top-center" />
         </LanguageProvider>

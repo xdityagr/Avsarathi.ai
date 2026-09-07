@@ -112,7 +112,10 @@ function getSnapshot(): Application[] {
   return snapshot;
 }
 
-const getServerSnapshot = (): Application[] => [];
+// One frozen array, not a fresh one per call: React compares snapshots by
+// identity, so returning a new [] every time spins forever.
+const NONE: Application[] = [];
+const getServerSnapshot = (): Application[] => NONE;
 
 /* The clock, read the same way as any other external source.
  *

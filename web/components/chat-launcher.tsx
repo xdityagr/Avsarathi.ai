@@ -5,6 +5,7 @@ import { useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 
 import { ChatPanel } from "@/components/chat-panel";
+import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
  * most people.
  */
 export function ChatLauncher() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -28,10 +30,10 @@ export function ChatLauncher() {
         type="button"
         onClick={() => setOpen(true)}
         className="fixed bottom-5 right-5 z-40 h-12 gap-2 rounded-full px-5 shadow-lg"
-        aria-label="Ask Avsarathi"
+        aria-label={t("chat.title")}
       >
         <MessageCircle className="size-4" />
-        <span className="hidden sm:inline">Ask</span>
+        <span className="hidden sm:inline">{t("chat.launcher")}</span>
       </Button>
 
       {open ? (
@@ -44,21 +46,21 @@ export function ChatLauncher() {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Ask Avsarathi"
+            aria-label={t("chat.title")}
             className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-paper shadow-xl"
           >
             <header className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
-                <h2 className="font-display text-base font-bold">Ask Avsarathi</h2>
+                <h2 className="font-display text-base font-bold">{t("chat.title")}</h2>
                 <p className="text-xs text-muted-foreground">
-                  Loans, in your language
+                  {t("chat.subtitle")}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setOpen(false)}
-                aria-label="Close"
+                aria-label={t("nav.menu.close")}
               >
                 <X className="size-5" />
               </Button>

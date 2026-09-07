@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search } from "lucide-react";
 
+import { FilterDisclosure } from "@/components/filter-disclosure";
 import { SchemeFilters } from "@/components/scheme-filters";
 import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -79,15 +80,15 @@ export default async function SchemesPage({
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
         <aside className="lg:sticky lg:top-24 lg:self-start">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <SlidersHorizontal className="size-4" />
-            {t("schemes.filter")}
-          </h2>
-          <SchemeFilters
-            meta={meta}
-            active={{ q, category, state, level }}
-            className="mt-4"
-          />
+          <FilterDisclosure
+            activeCount={[category, state, level].filter(Boolean).length}
+          >
+            <SchemeFilters
+              meta={meta}
+              active={{ q, category, state, level }}
+              className="mt-4"
+            />
+          </FilterDisclosure>
         </aside>
 
         <section>

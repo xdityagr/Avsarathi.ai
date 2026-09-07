@@ -179,7 +179,9 @@ export function ChatPanel({ className }: { className?: string }) {
     <div className={cn("flex min-h-0 flex-col", className)}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
-          {empty && agentic ? <Opening onPick={send} /> : null}
+          {empty || turns.length <= 2 ? (
+            <Opening onPick={send} agentic={agentic} />
+          ) : null}
 
           <div className="space-y-6">
             {turns.map((turn, index) =>
@@ -313,7 +315,13 @@ export function ChatPanel({ className }: { className?: string }) {
 }
 
 /** Starter questions, phrased the way people actually ask them. */
-function Opening({ onPick }: { onPick: (message: string) => void }) {
+function Opening({
+  onPick,
+  agentic,
+}: {
+  onPick: (message: string) => void;
+  agentic: boolean | null;
+}) {
   const { t } = useLanguage();
   const suggestions = [
     "I want to open a tailoring shop. What can I get?",
@@ -323,7 +331,7 @@ function Opening({ onPick }: { onPick: (message: string) => void }) {
   ];
 
   return (
-    <div className="pb-8">
+    <div className="pb-6">
       <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
         <Sparkles className="size-5" />
       </span>
@@ -332,7 +340,11 @@ function Opening({ onPick }: { onPick: (message: string) => void }) {
       </h2>
       <p className="mt-2 max-w-xl text-muted-foreground">{t("chat.lede")}</p>
 
-      <div className="mt-6 grid gap-2 sm:grid-cols-2">
+      {/* Sample questions only make sense when open questions are understood.
+          In the guided flow the options below the composer are the way in. */}
+      <div
+        className={agentic ? "mt-6 grid gap-2 sm:grid-cols-2" : "hidden"}
+      >
         {suggestions.map((suggestion) => (
           <button
             key={suggestion}
