@@ -11,6 +11,7 @@ No LLM on this path. Every figure is deterministic and reproducible.
 
 from __future__ import annotations
 
+import base64
 import logging
 from pathlib import Path
 from typing import Optional
@@ -39,6 +40,12 @@ from src.routing import (
 )
 from src.schemes import UserProfile, evaluate_eligibility, notable_rejections
 from src.seed import partners_near
+from src.verification import (
+    ProofGrade,
+    VerificationError,
+    describe as describe_verification,
+    verify_offline_ekyc,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +53,17 @@ router = APIRouter(prefix="/api", tags=["portal"])
 
 MEDIA_DIR = Path("data/maps")
 TILE_CACHE_DIR = Path("data/tiles")
+
+
+class VerifyRequest(BaseModel):
+    """A UIDAI offline e-KYC archive, base64-encoded, plus its share code.
+
+    Base64 in JSON rather than multipart so the portal needs no extra
+    dependency. Neither the archive nor the share code is persisted — the share
+    code is the resident's own secret and the archive is theirs, not ours.
+    """
+    file_base64: str
+    share_code: str
 
 
 class RecommendRequest(BaseModel):
@@ -248,3 +266,41 @@ async def recommend(request: RecommendRequest) -> dict:
             logger.warning("Map render failed (continuing without it): %s", exc)
 
     return response
+
+
+@router.post("/verify")
+async def verify_identity(request: VerifyRequest) -> dict:
+    """Verify an Aadhaar Paperless Offline e-KYC file.
+
+    Proves name, date of birth, gender and address against UIDAI's own
+    signature. It does NOT prove caste or income — those are separate
+    certificates needing DigiLocker Requester onboarding — so this never gates a
+    recommendation. An unverified user gets the same answer, graded DECLARED.
+    """
+    try:
+        payload = base64.b64decode(request.file_base64, validate=True)
+    except Exception:
+        return {"grade": ProofGrade.DECLARED.value, "ok": False,
+                "message": "That file didn't arrive intact. Try uploading it again.",
+                "checks": []}
+
+    try:
+        result = verify_offline_ekyc(payload, request.share_code)
+    except VerificationError as exc:
+        return {"grade": ProofGrade.DECLARED.value, "ok": False,
+                "message": str(exc), "checks": []}
+
+    kyc = result.kyc
+    return {
+        "grade": result.grade.value,
+        "ok": result.ok,
+        "message": describe_verification(result),
+        "checks": result.checks,
+        # Demographics only. There is no Aadhaar number in the file, and none here.
+        "name": kyc.name if kyc else "",
+        "date_of_birth": kyc.date_of_birth if kyc else "",
+        "gender": kyc.normalised_gender if kyc else "",
+        "district": kyc.district if kyc else "",
+        "state": kyc.state if kyc else "",
+        "aadhaar_last4": kyc.aadhaar_last4 if kyc else "",
+    }

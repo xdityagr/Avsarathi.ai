@@ -70,6 +70,7 @@
             </select>
           </av-field>
         </div>
+        <av-verify></av-verify>
         <div class="form-actions">
           <button class="btn" id="go" type="submit">Find schemes</button>
         </div>
@@ -111,6 +112,14 @@ function show(tab){
   if (tab === "corpus") loadCorpus();
 }
 TABS.forEach(t => $("t-" + t).addEventListener("click", () => show(t)));
+
+/* A verified file can fill in what it actually proves. It proves gender; it does
+   NOT prove caste or income, so those stay exactly as the person entered them. */
+let proofGrade = "DECLARED";
+document.addEventListener("verified", e => {
+  proofGrade = e.detail.grade;
+  if (e.detail.ok && e.detail.gender) $("gender").value = e.detail.gender;
+});
 if (location.hash) show(location.hash.slice(1));
 
 /* ---------------------------------------------------------- helpers */

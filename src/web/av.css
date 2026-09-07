@@ -204,3 +204,24 @@ td .t-sub{font-size:.8125rem; color:var(--muted); margin-top:2px}
 
 .empty{border:1px solid var(--line); border-radius:2px; padding:26px; color:var(--muted)}
 .lede-note{font-size:.9375rem; color:var(--ink-2); max-width:var(--measure)}
+
+/* ---------- identity verification ---------- */
+av-verify{display:block; margin-top:30px; padding-top:26px; border-top:1px solid var(--line)}
+av-verify .v-title{font-size:.9375rem; font-weight:500; margin-bottom:6px}
+av-verify .v-note{font-size:.8125rem; color:var(--muted); max-width:64ch; line-height:1.55; margin:0}
+av-verify .v-row{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:16px}
+av-verify input[type=file]{font:inherit; font-size:.875rem; color:var(--ink-2); max-width:280px}
+av-verify input[type=text]{
+  font:inherit; font-size:.9375rem; width:130px; padding:8px 11px;
+  border:1px solid var(--line-2); border-radius:2px; background:var(--bg);
+}
+av-verify input[type=text]:focus{outline:0; border-color:var(--ink)}
+av-verify .v-out{
+  margin-top:16px; font-size:.875rem; line-height:1.55; max-width:64ch;
+  padding:12px 14px; border-radius:2px; border-left:2px solid var(--line-2);
+  background:var(--bg-alt); color:var(--ink-2);
+}
+av-verify .v-out[data-grade="VERIFIED"]{
+  border-left-color:var(--accent); background:var(--accent-soft); color:var(--accent);
+}
+

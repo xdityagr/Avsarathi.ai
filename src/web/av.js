@@ -137,6 +137,69 @@ class AvPartner extends DataElement {
   }
 }
 
+/* ------------------------------------------------------------- av-verify */
+
+class AvVerify extends HTMLElement {
+  /** Aadhaar offline e-KYC upload. Proves identity, never gates the answer. */
+  connectedCallback() {
+    if (this._done) return;
+    this._done = true;
+    this.innerHTML = `
+      <div class="v-head">
+        <div class="v-title">Prove who you are (optional)</div>
+        <p class="v-note">Upload the Aadhaar offline e-KYC file you downloaded from
+          UIDAI, with the share code you chose. We check UIDAI's own signature.
+          Your Aadhaar number is not in the file and never reaches us — and your
+          recommendation is the same either way.</p>
+      </div>
+      <div class="v-row">
+        <input type="file" accept=".zip" id="v-file">
+        <input type="text" id="v-code" placeholder="Share code" maxlength="12" autocomplete="off">
+        <button type="button" class="btn ghost" id="v-go">Verify</button>
+      </div>
+      <div class="v-out" id="v-out" hidden></div>`;
+
+    this.querySelector("#v-go").addEventListener("click", () => this.verify());
+  }
+
+  async verify() {
+    const file = this.querySelector("#v-file").files[0];
+    const code = this.querySelector("#v-code").value.trim();
+    const out = this.querySelector("#v-out");
+    const btn = this.querySelector("#v-go");
+
+    if (!file || !code) {
+      out.hidden = false;
+      out.dataset.grade = "DECLARED";
+      out.textContent = "Choose the e-KYC file and enter its share code.";
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = "Checking…";
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const res = await fetch("/api/verify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_base64: btoa(binary), share_code: code }),
+      });
+      const d = await res.json();
+      out.hidden = false;
+      out.dataset.grade = d.grade;
+      out.textContent = plain(d.message);
+      this.dispatchEvent(new CustomEvent("verified", { detail: d, bubbles: true }));
+    } catch (err) {
+      out.hidden = false;
+      out.dataset.grade = "DECLARED";
+      out.textContent = "Couldn't check that file — " + err.message;
+    } finally {
+      btn.disabled = false; btn.textContent = "Verify";
+    }
+  }
+}
+
+customElements.define("av-verify", AvVerify);
 customElements.define("av-field", AvField);
 customElements.define("av-tag", AvTag);
 customElements.define("av-notice", AvNotice);
