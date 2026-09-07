@@ -3,6 +3,11 @@
 **Target: a 4-minute pitch that wins the room, plus Q&A.**
 Companion to `PRD-v3.md` (features), `data-sources.md` (corpus), `BUSINESS-PLAN.md` (scale story).
 
+> **Build status as of 2026-09-07** — branch `feat/mvp-corpus-routing`, 221 tests passing.
+> 11 of 14 items done, plus a web product that was never in this plan. Two things
+> in the pitch script below no longer match what exists — both are marked in §1 and
+> listed in §2.2. Read those before rehearsing.
+
 ---
 
 ## 0. The principle
@@ -31,8 +36,8 @@ Do not open with the scheme, the ministry, or the tech. Open with her. Everythin
 
 | Time | Beat | What the judge sees |
 |---|---|---|
-| 0:30 | **Voice note, in Hindi** | She *speaks* — no typing, no language menu. The reply comes back spoken, in Hindi. Say: *"we never asked her what language she speaks — we detected the script"* |
-| 0:55 | **Intake, buttons not questions** | Cost, income, education status. Four taps. Fast — don't linger |
+| 0:30 | **She types in Hindi** | She types *मुझे सिलाई की दुकान खोलनी है* and the whole app answers in Hindi. Say: *"we never asked her what language she speaks — we detected the script"*. **Voice is NOT built** — do not promise a spoken reply |
+| 0:55 | **Six taps, no form** | Purpose, cost, family income, category, who's applying, where. Every question has tappable options; typing is optional. Fast — don't linger |
 | 1:10 | **The Why / Why-Not trail** | *Qualifies* for Micro Finance — here's the arithmetic. Does **not** qualify for Term Loan — **and here's why.** Explaining the rejection is the literacy moment |
 | 1:20 | **True Cost + Moneylender Comparison** | *"This loan costs her ₹12,568. The same money from a moneylender would cost ₹1,78,200."* **Stop talking for one beat.** This is the emotional peak of the pitch |
 | 1:45 | **Map — and an exclusion** | Nearest partners, on a real map. Then show one that is **excluded**, with the reason: *"this agency hasn't utilised its last release — it cannot disburse right now."* Prudential routing, made visible |
@@ -59,7 +64,7 @@ This is where you separate from every other team. Deliver them as *"and here's w
 >
 > India's flagship credit portal, **JanSamarth, carries 15 schemes and 269 banks — and zero of these.** Not an oversight: it's built for direct bank lending, and these lend through State Channelizing Agencies. **This is the one large government credit channel with no digital front door.**
 >
-> *[flip to the partner console]* And for the agency on the other side: a queue of pre-verified applications, sorted by completeness — instead of a pile of paper.
+> And for the agency on the other side: a queue of pre-verified applications, sorted by completeness — instead of a pile of paper. **(Say this as roadmap. The partner console is NOT currently in the UI — see §2.2.)**
 >
 > Sunita gets the right scheme, at the right price, from a partner who can actually pay her — and she makes **one trip instead of four.**
 
@@ -67,32 +72,94 @@ This is where you separate from every other team. Deliver them as *"and here's w
 
 ## 2. MVP build sheet
 
-Only what the four minutes needs. Sizes are relative (S ≈ half a day, M ≈ 1–2 days, L ≈ 3+ days) for a team already holding a working Phase 0–3.
+### 2.1 Status against the original 14
 
-| # | Item | Size | Serves | Notes |
-|---|---|---|---|---|
-| 1 | **Plane A corpus — 5 schemes** | M | reveal 1 | Dual rates, quarterly repayment, rate-by-partner-type. Config, not code |
-| 2 | **Tier 1 on 5 schemes** | M | 1:10 | Extend existing engine. Add `education_status`, family-income field |
-| 3 | **Why / Why-Not trail** | M | 1:10 | Engine must emit **reasons**, not booleans. Highest-value refactor here |
-| 4 | **Calculator — quarterly + monthly + True Cost** | S | 1:20 | Fix the monthly-vs-quarterly bug; add total-cost output |
-| 5 | **Moneylender Comparison** | S | 1:20 | Pure template. Cheapest high-impact feature in the whole plan |
-| 6 | **Utilisation data ingest** | M | reveal 2 | Download 9 Excel files, parse state-wise utilisation. **Do this early — it de-risks the biggest reveal** |
-| 7 | **Routing + exclusion reasons** | M | 1:45 | Prudential filter must return *why* a partner was excluded, as a sentence |
-| 8 | **Map → WhatsApp** | M | 1:45 | Static OSM render with pins + native location message |
-| 9 | **Cheapest Scheme + Cheapest Route** | S | 2:10 | Falls out of #1 + #7 almost free. Note: Sunita at ₹1.2L cannot demo the *partner-type* spread (that needs Udyam Nidhi at ₹1.4-5L), but she matches MFS at 6.5% and Aajeevika at 15% — the same money, 8.5 points apart. Stronger beat, no story change |
-| 10 | **Script detection + Hindi copy** | M | 0:30 | Unicode block lookup + Hindi templates. No model needed for detection |
-| 11 | **Voice in/out (Hindi)** | L | 0:30 | IndicConformer ASR + Indic Parler-TTS. **Highest technical risk — start it first** |
-| 12 | **Partner console — one screen** | M | 3:30 | Read-only queue + prudential status + map. One screen, not an app |
-| 13 | **Aadhaar offline XML verify** | M | reveal 3 | Unzip, parse, verify XMLDSig vs UIDAI cert. A 10-second reveal, not a flow |
-| 14 | **Demo ops + cache warming** | M | all | See §5. Not optional |
+Sizes were relative (S ≈ half a day, M ≈ 1–2 days, L ≈ 3+). **11 of 14 done.**
 
-### Explicitly NOT in the MVP
+| # | Item | Status | Where it lives |
+|---|---|---|---|
+| 1 | Plane A corpus — 5 schemes | **Done** | `corpus/v1/schemes.json`, `src/corpus/` |
+| 2 | Tier 1 on 5 schemes | **Done** | `src/schemes.py` |
+| 3 | Why / Why-Not trail | **Done** | `EligibilityResult.rejections` with stable `rule` tags |
+| 4 | Calculator — quarterly + True Cost | **Done** | `src/calculator.py` (`periods_per_year`) |
+| 5 | Moneylender Comparison | **Done** | `src/literacy.py` |
+| 6 | Utilisation data ingest | **Done, real** | `src/corpus/ingest.py` — 36 states × 9 FYs, to 31 Jul 2026 |
+| 7 | Routing + exclusion reasons | **Done** | `src/routing.py` |
+| 8 | Map | **Done** | `src/maps.py` — OSM tiles, local cache, offline after one run |
+| 9 | Cheapest Scheme + Route | **Done** | Scheme comparison live; partner-rate route stays silent unless a spread is published |
+| 10 | Script detection + Hindi | **Exceeded** | 5 languages, not 2 — `src/i18n.py` |
+| 11 | Voice in/out | **Not built** | Deliberately deferred |
+| 12 | Partner console | **Regressed** | Existed as a tab; the chat rebuild dropped it — see §2.2 |
+| 13 | Aadhaar offline XML verify | **Done** | `src/verification.py`, real XMLDSig |
+| 14 | Demo ops + cache warming | **Partial** | Tile cache works; no warm-up script yet |
 
-L5 origination · project report (DPR) · packet assembly · DigiLocker L2 · assisted/CSC mode · Ground-Truth Loop · the other five corporations (schema ready, unpopulated) · full Plane B / Ask Anything · telephony IVR · languages beyond Hindi + English.
+### 2.2 Two gaps that change the pitch
 
-Every one is in `PRD-v3.md`. **Say them as roadmap, don't build them.** A judge asking "can you do X" and hearing *"yes — here's exactly how, it's phase 2"* costs nothing. A half-built X that breaks on stage costs the round.
+**The partner console is gone from the UI.** It existed as a tab in the first
+web portal — a table of every agency with its utilisation and provenance. The
+chat-first rebuild replaced that portal and the tab went with it. The engine and
+`/api/partners` still work, so it is a UI rebuild, not a data problem. Until it
+is back, the 3:30 beat is roadmap, not a demo.
 
-One exception worth considering if time allows: **~10 hardcoded FAQ pairs** so an unexpected judge question gets answered instead of hitting a wall. Half a day, disproportionate insurance.
+**Voice does not exist.** Script detection on *typed* text is what is built, and
+it is genuinely good — type in Devanagari and the whole app switches to Hindi
+from the first message. But the original 0:30 beat promised a spoken reply.
+Do not promise it.
+
+### 2.3 Built beyond the plan
+
+None of this was in the original 14. It came out of the work and it is now the
+larger half of the demo.
+
+| What | Why it matters |
+|---|---|
+| **Chat-first web product** (`/app`) | The plan assumed WhatsApp plus one console screen. There is now a full conversational web app: splash, language pick, six tappable questions, rich result cards. This is the thing a judge will actually be shown |
+| **Landing page** (`/`) | Somewhere to send a judge or a partner that explains the product in ten seconds |
+| **Five languages** | Hindi, English, Marathi, Bengali, Tamil — chosen by SC population. Numbers are never translated, only formatted, so a translation bug cannot change what a loan costs |
+| **`src/chat.py`** | Same engine as WhatsApp, different presentation: structured cards for a browser instead of the text block WhatsApp is limited to |
+| **Provenance-stamped corpus** | Every scheme number carries its source URL and fetch date. This is what makes "we read the source" checkable rather than a claim |
+| **Declarative scraper** | `data-sources.md` §7 — a source registry plus extractor strategies, not twenty bespoke scripts |
+| **Aadhaar demo mode** | A clearly-labelled demonstration certificate so reveal 3 is showable without UIDAI's real cert, and never presented as UIDAI's |
+| **Custom-element library** | `src/web/av.js` — the cards render from API data, so adding a card type is a server change |
+
+### 2.4 Bugs found and fixed — say these if asked what went wrong
+
+Worth having ready. "What broke?" is a common judge question and a specific
+answer beats a shrug.
+
+- **The app could not start.** `AsyncSqliteSaver.from_conn_string()` returns an
+  async context manager, not a saver; `.setup()` on it raised. Unit tests stubbed
+  the checkpointer, so nothing caught it until the server ran for real.
+- **Business loans were offered to education applicants.** Project types lived in
+  a module-level dict and a scheme missing from it matched *everything* — which
+  happened the moment the corpus grew past three schemes.
+- **Quarterly loans were priced monthly**, and every scheme used one global
+  84-month tenure instead of its own.
+- **A single message contradicted itself**: the intro quoted a 6-month grace and
+  `rate_max` while the block underneath said 3 months and used `rate_min`.
+- **Men were quoted the women's rebate** — the rate was reduced whenever the
+  scheme had a rebate, without checking gender.
+- **A Ballia applicant was routed to the Bihar agency.** An SCA channels funds
+  within its own state; distance alone cannot make that valid.
+- **The prudential rule was inverted.** Low utilisation was *excluding* agencies,
+  but an agency below 100% is by definition sitting on undeployed funds. The PS
+  names its exclusion criteria as "high NPAs or overdues" — not low utilisation —
+  and excluding idle-fund agencies is the opposite of the fund-utilisation goal.
+
+### 2.5 Still explicitly NOT built — say these as roadmap
+
+Voice in and out · telephony IVR · L5 origination, project report (DPR) and
+packet assembly · DigiLocker caste/income pull (rung L2) · assisted CSC mode ·
+Ground-Truth Loop · the other five corporations (schema ready, unpopulated) ·
+full Plane B / Ask Anything.
+
+Every one is specified in `PRD-v3.md`. A judge asking "can you do X" and hearing
+*"yes — here is exactly how, it is phase 2"* costs nothing. A half-built X that
+breaks on stage costs the round.
+
+**The one worth adding if there is time:** ~10 hardcoded FAQ pairs so an
+unexpected question gets an answer instead of a wall. Half a day, disproportionate
+insurance.
 
 ---
 
@@ -115,21 +182,30 @@ The national rule is 6 members with at least 1 female member. Lane 6 doubles as 
 
 ---
 
-## 4. Sequencing
+## 4. What is left, in order
 
-**Week 1 — de-risk, don't polish.**
-Voice pipeline spiked end-to-end (lane 3) · utilisation Excel downloaded and parsed (lane 1) · corpus to 5 schemes (lane 1) · Why/Why-Not refactor started (lane 2). If voice or the Excel parse is going to fail, find out now while there's still time to cut them.
+The original four-week sequence is spent. This is what remains.
 
-**Week 2 — the demo path works once, badly.**
-Every beat in §1 reachable end to end, ugly but real. Nothing is "nearly done."
+**1. Look at the UI.** Two design passes shipped without being seen in a browser
+(Chrome on the dev machine cannot reach the local server — TLS interception on
+the tunnel, and localhost is unreachable from it). Nothing else matters until
+someone opens `/app` on a phone and a laptop and says whether it is good.
 
-**Week 3 — make it true.**
-Real numbers, exclusion reasons in plain language, Hindi copy reviewed by a native speaker, map rendering properly on a phone screen. **Deploy to a real host** — not `localhost`, not a dev tunnel.
+**2. Rebuild the partner console** (§2.2). One screen: the agency table with
+utilisation and provenance that `/api/partners` already returns. Without it the
+3:30 beat has nothing behind it.
 
-**Week 4 — stop building.**
-`prompt.md`'s rule, and it's right: stop writing new code with real buffer left. Rehearse, break it deliberately, fix what breaks. That time is worth more than one more feature.
+**3. Add `GEMINI_API_KEY`.** Free-text understanding currently falls back to
+keyword matching. It handles *"I want to open a small tailoring shop"*; it will
+not handle a genuinely open question.
 
----
+**4. Twilio Sandbox** for the live WhatsApp demo — setup is in the README. The
+graph is proven end to end; only the transport is untested.
+
+**5. Voice**, if there is time, and only after everything above is solid.
+
+**6. Cache warming + rehearsal.** §5 below. Stop writing code with real buffer
+left; that time is worth more spent breaking the demo deliberately.
 
 ## 5. Demo ops — the part teams skip and lose on
 
@@ -159,6 +235,24 @@ No. Eligibility, EMI, literacy, the locator and the checklist are free permanent
 
 **"Why should we believe your numbers when your own docs say sources disagree?"**
 Because we resolved it and can show our work. The rate conflict was a wrong-model problem — three schemes versus five. The income conflict was stale data: ₹5 lakh, rural and urban, effective 7 January 2026. Every field in our corpus carries a source URL and a fetch date. **That the information is this fragmented is the problem statement's own thesis — and it's why a maintained corpus is the product.**
+
+---
+
+**"Is that Aadhaar check real?"**
+The cryptography is real: full enveloped XMLDSig verification — the document is
+canonicalised, digested and compared, then the signature is RSA-verified over the
+signed info. Tampering with the name or the address is caught, and the tests prove
+it. What is not real in the demo is the *certificate*: UIDAI distributes its own
+and we do not bundle it, so the demo verifies against a clearly-labelled
+demonstration certificate and says so on screen. On a real file it is the same
+check. Also worth saying: this needs no licence — offline e-KYC makes us an
+Offline Verification Seeking Entity, not an AUA, and the file contains no Aadhaar
+number at all.
+
+**"Why should we trust the interface if you built it fast?"**
+Everything a borrower sees that involves money is a deterministic template, not
+model output — `src/literacy.py`. No rupee figure on screen can be hallucinated.
+The model writes the greeting, nothing else.
 
 ---
 
