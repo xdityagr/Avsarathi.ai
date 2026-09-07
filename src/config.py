@@ -82,11 +82,11 @@ class Settings(BaseSettings):
     # --- LLM Settings (Phase 3) ---
     gemini_api_key: str = Field(default="", description="Gemini API Key")
     gemini_model_extraction: str = Field(
-        default="gemini-2.5-flash-lite",
+        default="gemini-3.5-flash-lite",
         description="Model for Tier 2 extraction (higher free tier limit)"
     )
     gemini_model_generation: str = Field(
-        default="gemini-2.5-flash",
+        default="gemini-3.8-flash",
         description="Model for generation on cache miss"
     )
 
@@ -102,7 +102,11 @@ class Settings(BaseSettings):
     )
 
     model_config = {
-        "env_file": ".env",
+        # Both locations are read, project root last so it wins on a clash.
+        # `src/.env` sits next to the code and is the one people reach for
+        # first; silently ignoring it means a key that looks configured but
+        # isn't, which is a miserable thing to debug.
+        "env_file": ("src/.env", ".env"),
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
     }

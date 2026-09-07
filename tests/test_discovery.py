@@ -323,3 +323,58 @@ class TestFacetIndex:
         # 'age' and income come from the eligibility bands, not the facet index.
         unhandled = set(MATCHING_FACETS) - handled
         assert not unhandled, f"facet(s) crawled but never matched on: {unhandled}"
+
+
+# ---------------------------------------------------------------------------
+# The words people actually use
+# ---------------------------------------------------------------------------
+
+class TestVocabulary:
+    """A word we fail to map is not a harmless miss.
+
+    It passes through unchanged, matches no facet value, and silently hides
+    every scheme reserved for that community — while still returning hundreds of
+    generic results, so nothing looks wrong. This came from watching a language
+    model return "Dalit" where the corpus says "Scheduled Caste (SC)".
+    """
+
+    def test_dalit_and_sc_are_the_same_search(self, corpus):
+        from src.discovery import CASTE_LABELS
+        assert CASTE_LABELS["dalit"] == CASTE_LABELS["sc"]
+        plain = discover(Facets(caste="sc"), limit=100, corpus_path=corpus)
+        spoken = discover(Facets(caste="Dalit"), limit=100, corpus_path=corpus)
+        assert names(plain) == names(spoken)
+
+    def test_lookup_is_case_insensitive(self, corpus):
+        for word in ("SC", "sc", "Scheduled Caste", "scheduled caste (SC)"):
+            result = discover(Facets(caste=word), limit=100, corpus_path=corpus)
+            assert "sc-targeted" in names(result), word
+            assert "st-only" not in names(result), word
+
+    def test_adivasi_reaches_scheduled_tribe_schemes(self, corpus):
+        result = discover(Facets(caste="adivasi"), limit=100, corpus_path=corpus)
+        assert "st-only" in names(result)
+        assert "sc-targeted" not in names(result)
+
+    def test_spoken_gender_and_residence_words_map(self, corpus):
+        assert "women-only" in names(
+            discover(Facets(gender="woman"), limit=100, corpus_path=corpus))
+        assert "women-only" not in names(
+            discover(Facets(gender="man"), limit=100, corpus_path=corpus))
+        from src.discovery import RESIDENCE_LABELS
+        assert RESIDENCE_LABELS["village"] == RESIDENCE_LABELS["rural"]
+        assert RESIDENCE_LABELS["city"] == RESIDENCE_LABELS["urban"]
+
+    def test_every_synonym_points_at_a_real_corpus_value(self):
+        """A synonym mapping to a string the corpus does not use is worse than
+        no synonym: it looks handled and returns nothing."""
+        from src.discovery import CASTE_LABELS, GENDER_LABELS, RESIDENCE_LABELS
+        real_caste = {
+            "Scheduled Caste (SC)", "Scheduled Tribe (ST)",
+            "Other Backward Class (OBC)", "General",
+            "Particularly Vulnerable Tribal Group (PVTG)",
+            "De-Notified, Nomadic, and Semi-Nomadic (DNT) communities",
+        }
+        assert set(CASTE_LABELS.values()) <= real_caste
+        assert set(GENDER_LABELS.values()) <= {"Female", "Male", "Transgender"}
+        assert set(RESIDENCE_LABELS.values()) <= {"Rural", "Urban"}

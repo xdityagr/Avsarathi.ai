@@ -170,21 +170,54 @@ def _json_list(raw: Any) -> list:
 # memory, and `scripts/check_facet_labels.py` fails the build if one drifts.
 # ---------------------------------------------------------------------------
 
+# Keys are lowercased on lookup, and the synonyms matter more than they look.
+# People say "Dalit", not "Scheduled Caste (SC)", and so does a language model
+# repeating what they said. An unmapped word passes through unchanged, fails to
+# match the facet, and silently hides every scheme reserved for that community —
+# the exact failure this product exists to prevent.
 CASTE_LABELS = {
     "sc": "Scheduled Caste (SC)",
+    "dalit": "Scheduled Caste (SC)",
+    "scheduled caste": "Scheduled Caste (SC)",
+    "scheduled caste (sc)": "Scheduled Caste (SC)",
+    "dalit (scheduled caste)": "Scheduled Caste (SC)",
+    "harijan": "Scheduled Caste (SC)",
+
     "st": "Scheduled Tribe (ST)",
+    "adivasi": "Scheduled Tribe (ST)",
+    "tribal": "Scheduled Tribe (ST)",
+    "scheduled tribe": "Scheduled Tribe (ST)",
+    "scheduled tribe (st)": "Scheduled Tribe (ST)",
+
     "obc": "Other Backward Class (OBC)",
+    "other backward class": "Other Backward Class (OBC)",
+    "other backward classes": "Other Backward Class (OBC)",
+    "backward class": "Other Backward Class (OBC)",
+    "bc": "Other Backward Class (OBC)",
+
     "general": "General",
+    "gen": "General",
+    "unreserved": "General",
+
     "pvtg": "Particularly Vulnerable Tribal Group (PVTG)",
+    "particularly vulnerable tribal group": "Particularly Vulnerable Tribal Group (PVTG)",
+
     "dnt": "De-Notified, Nomadic, and Semi-Nomadic (DNT) communities",
+    "denotified": "De-Notified, Nomadic, and Semi-Nomadic (DNT) communities",
+    "de-notified": "De-Notified, Nomadic, and Semi-Nomadic (DNT) communities",
+    "nomadic": "De-Notified, Nomadic, and Semi-Nomadic (DNT) communities",
 }
 
 GENDER_LABELS = {
-    "female": "Female", "male": "Male", "transgender": "Transgender",
-    "other": "Transgender",
+    "female": "Female", "woman": "Female", "women": "Female", "f": "Female",
+    "male": "Male", "man": "Male", "men": "Male", "m": "Male",
+    "transgender": "Transgender", "trans": "Transgender", "other": "Transgender",
 }
 
-RESIDENCE_LABELS = {"rural": "Rural", "urban": "Urban"}
+RESIDENCE_LABELS = {
+    "rural": "Rural", "village": "Rural", "gaon": "Rural",
+    "urban": "Urban", "city": "Urban", "town": "Urban",
+}
 
 EMPLOYMENT_LABELS = {
     "employed": "Employed",

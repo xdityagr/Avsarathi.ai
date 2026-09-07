@@ -37,7 +37,7 @@ from src.seed import partners_near
 
 logger = logging.getLogger(__name__)
 
-MAX_TOOL_ROUNDS = 4
+MAX_TOOL_ROUNDS = 5
 
 SYSTEM_PROMPT = """\
 You are Avsarathi, an assistant that helps people in India — especially \
@@ -437,11 +437,12 @@ async def respond(
                         else AIMessage(content=text))
     messages.append(HumanMessage(content=message))
 
-    llm = ChatGoogleGenerativeAI(
+    base = ChatGoogleGenerativeAI(
         model=settings.gemini_model_generation,
         google_api_key=settings.gemini_api_key,
         temperature=0.2,
-    ).bind_tools([{"function_declarations": TOOL_SCHEMAS}])
+    )
+    llm = base.bind_tools([{"function_declarations": TOOL_SCHEMAS}])
 
     reply = AgentReply(used_model=True)
 
@@ -485,8 +486,21 @@ async def respond(
                 tool_call_id=call.get("id") or name or "tool",
             ))
 
-    # Out of rounds: answer with what we have rather than looping forever.
-    reply.text = _text_of(messages[-1]) if messages else ""
+    # Out of tool rounds. Ask once more with the tools withheld, so the model
+    # has no option but to write prose.
+    #
+    # The bug this replaces returned `messages[-1]`, which at this point is a
+    # ToolMessage — meaning a person who asked about their daughter's schooling
+    # got a wall of raw JSON. Anything is better than that, including silence:
+    # the interface still renders the cards and the lookup trace, which are the
+    # parts that carry the facts.
+    try:
+        final = await base.ainvoke(messages)
+        reply.text = _text_of(final)
+    except Exception as exc:                          # noqa: BLE001
+        logger.warning("Final answer failed after %d tool rounds: %s",
+                       MAX_TOOL_ROUNDS, exc)
+        reply.text = ""
     return reply
 
 
