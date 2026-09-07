@@ -40,6 +40,13 @@ DSIG_NS = "http://www.w3.org/2000/09/xmldsig#"
 # would be worse than saying we can't.
 UIDAI_CERT_PATH = Path(__file__).resolve().parents[1] / "corpus" / "uidai_signing_cert.pem"
 
+# A self-signed certificate used ONLY to demonstrate the verification path when
+# UIDAI's real certificate isn't installed. It is never treated as UIDAI's: a
+# result verified against it is labelled DEMO everywhere it surfaces, so nobody
+# can mistake a demonstration for a real identity check. Off unless
+# EKYC_DEMO_MODE is set.
+DEMO_CERT_PATH = Path(__file__).resolve().parents[1] / "corpus" / "demo_signing_cert.pem"
+
 
 class ProofGrade(str, Enum):
     """How well established a fact is. Propagates to the eligibility result."""
@@ -82,6 +89,7 @@ class VerificationResult:
     grade: ProofGrade = ProofGrade.DECLARED
     kyc: Optional[OfflineKyc] = None
     signature_valid: bool = False
+    is_demo: bool = False    # verified against the demo cert, not UIDAI's
     reason: str = ""
     checks: list[str] = field(default_factory=list)
 
@@ -227,12 +235,18 @@ def verify_xml_signature(xml_bytes: bytes, cert_pem: bytes) -> tuple[bool, str]:
         return False, "The signature did not verify against the UIDAI certificate."
 
 
-def _load_uidai_cert(cert_pem: Optional[bytes]) -> Optional[bytes]:
+def _load_cert(cert_pem: Optional[bytes]) -> tuple[Optional[bytes], bool]:
+    """Return (certificate, is_demo). The real one always wins."""
     if cert_pem:
-        return cert_pem
+        return cert_pem, False
     if UIDAI_CERT_PATH.exists():
-        return UIDAI_CERT_PATH.read_bytes()
-    return None
+        return UIDAI_CERT_PATH.read_bytes(), False
+
+    import os
+    demo_enabled = os.environ.get("EKYC_DEMO_MODE", "").lower() in ("1", "true", "yes")
+    if demo_enabled and DEMO_CERT_PATH.exists():
+        return DEMO_CERT_PATH.read_bytes(), True
+    return None, False
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +271,7 @@ def verify_offline_ekyc(
     result.checks.append("Archive opened with the share code")
     result.checks.append("Demographics parsed")
 
-    cert = _load_uidai_cert(cert_pem)
+    cert, is_demo = _load_cert(cert_pem)
     if cert is None:
         result.grade = ProofGrade.DECLARED
         result.reason = (
@@ -268,10 +282,17 @@ def verify_offline_ekyc(
 
     valid, reason = verify_xml_signature(xml_bytes, cert)
     result.signature_valid = valid
-    result.reason = reason
+    result.is_demo = is_demo
     result.grade = ProofGrade.VERIFIED if valid else ProofGrade.DECLARED
+    result.reason = (
+        reason.replace("the UIDAI certificate", "a DEMONSTRATION certificate")
+        if is_demo else reason
+    )
     if valid:
-        result.checks.append("UIDAI signature verified")
+        result.checks.append(
+            "Signature verified against a DEMONSTRATION certificate, not UIDAI's"
+            if is_demo else "UIDAI signature verified"
+        )
         result.checks.append("Document digest matches — contents unaltered")
     return result
 
@@ -279,6 +300,13 @@ def verify_offline_ekyc(
 def describe(result: VerificationResult) -> str:
     """One line for a user, in the same register as the rest of the copy."""
     if result.ok and result.kyc:
+        if result.is_demo:
+            return (
+                f"*Identity verified (DEMONSTRATION)* — {result.kyc.name}, "
+                f"Aadhaar ending {result.kyc.aadhaar_last4}. "
+                f"The signature checks out, but against a demonstration certificate — "
+                f"not UIDAI's. On a real file this is the same check."
+            )
         return (
             f"*Identity verified* — {result.kyc.name}, "
             f"Aadhaar ending {result.kyc.aadhaar_last4}. "
