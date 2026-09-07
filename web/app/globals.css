@@ -1,0 +1,204 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-gold-ink: var(--gold-ink);
+  --color-verified: var(--verified);
+  --color-verified-soft: var(--verified-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --color-paper: var(--paper);
+  --color-ink: var(--foreground);
+  --font-display: var(--font-display);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ---------------------------------------------------------------------------
+   Avsarathi palette.
+
+   Deep teal carries the institutional weight this subject needs, and marigold
+   gives it warmth without the saffron-and-green cliché every government site
+   reaches for. The ground is warm off-white rather than pure white, so long
+   pages of scheme text read like paper instead of a spreadsheet.
+
+   Nothing glows. Depth comes from a hairline border and a low, tight shadow.
+--------------------------------------------------------------------------- */
+:root {
+  --paper: #faf8f4;
+  --background: #faf8f4;
+  --foreground: #14201d;
+
+  --card: #ffffff;
+  --card-foreground: #14201d;
+  --popover: #ffffff;
+  --popover-foreground: #14201d;
+
+  --primary: #0b5d51;
+  --primary-foreground: #f6fbf9;
+
+  --secondary: #edf3f1;
+  --secondary-foreground: #0b5d51;
+
+  --muted: #f2efe8;
+  --muted-foreground: #5d6b66;
+
+  /* Hover/active surface. Kept a quiet teal tint, not the brand gold, so
+     ghost buttons don't shout every time the cursor passes over them. */
+  --accent: #e8f1ee;
+  --accent-foreground: #0a4f45;
+
+  /* Marigold — reserved for emphasis that has earned it. */
+  --gold: #d9891f;
+  --gold-soft: #fdf3e3;
+  --gold-ink: #7a4a09;
+
+  --verified: #16794f;
+  --verified-soft: #e7f4ee;
+  --caution: #b3541e;
+  --caution-soft: #fdf0e7;
+  --destructive: #b3261e;
+
+  --border: #e5e0d6;
+  --input: #ded8cc;
+  --ring: #0b5d51;
+
+  --chart-1: #0b5d51;
+  --chart-2: #d9891f;
+  --chart-3: #16794f;
+  --chart-4: #5d6b66;
+  --chart-5: #b3541e;
+
+  --radius: 0.625rem;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #14201d;
+  --sidebar-primary: #0b5d51;
+  --sidebar-primary-foreground: #f6fbf9;
+  --sidebar-accent: #e8f1ee;
+  --sidebar-accent-foreground: #0a4f45;
+  --sidebar-border: #e5e0d6;
+  --sidebar-ring: #0b5d51;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+@layer base {
+  html {
+    /* The product is light-themed on purpose: it is read on cheap phone
+       screens in daylight, often by someone who is not a confident reader.
+       Locking the scheme stops the OS dark preference from inverting it. */
+    color-scheme: light;
+  }
+  body {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-display), Georgia, serif;
+    letter-spacing: -0.018em;
+  }
+  /* Indic scripts sit lower and need more room than Latin at the same size. */
+  :lang(hi), :lang(mr), :lang(bn), :lang(ta) {
+    line-height: 1.75;
+  }
+}
+
+@utility rule-y {
+  /* The hairline that does the work a drop shadow would otherwise do. */
+  border-block: 1px solid var(--border);
+}
+
+@utility card-quiet {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(20 32 29 / 0.04);
+}
