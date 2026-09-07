@@ -6,6 +6,7 @@ import { LanguageProvider } from "@/components/language-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { Toaster } from "@/components/ui/sonner";
+import { getLang } from "@/lib/i18n/server";
 import "./globals.css";
 
 /*
@@ -52,14 +53,16 @@ export const metadata: Metadata = {
     "and other marginalised households.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const lang = await getLang();
+
   return (
     <html
-      lang="en"
+      lang={lang}
       className={`${inter.variable} ${sourceSerif.variable} ${notoDevanagari.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        <LanguageProvider>
+        <LanguageProvider lang={lang}>
           <SiteHeader />
           <main className="flex-1">{children}</main>
           <SiteFooter />

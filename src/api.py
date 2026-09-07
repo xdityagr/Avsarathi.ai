@@ -21,6 +21,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from src.agent import is_available as agent_is_available, respond as agent_respond
 from src.calculator import calculate_emi
 from src.catalog import catalog_meta, get_scheme, search_schemes
 from src.config import SCHEMES, get_settings
@@ -516,3 +517,43 @@ async def geo_pin(pin: str) -> dict:
     """Six digits people know by heart, for when location is denied or absent."""
     place = await lookup_pin(pin)
     return place.as_dict()
+
+
+# ---------------------------------------------------------------------------
+# The assistant
+# ---------------------------------------------------------------------------
+
+class AgentRequest(BaseModel):
+    """A free-form question, plus whatever the interface already knows."""
+    message: str
+    history: list[dict] = Field(default_factory=list)
+    context: dict = Field(default_factory=dict)
+
+
+@router.get("/agent/status")
+async def agent_status() -> dict:
+    """Whether the assistant can reason, or only follow the script.
+
+    Exposed so the interface can say which mode it is in instead of quietly
+    degrading — a person deserves to know whether they are talking to something
+    that can answer a question they thought of themselves.
+    """
+    return {"available": agent_is_available()}
+
+
+@router.post("/agent")
+async def ask_agent(request: AgentRequest) -> dict:
+    """Answer a question by looking things up, and show what was looked up."""
+    reply = await agent_respond(
+        request.message, history=request.history, context=request.context,
+    )
+    return {
+        "text": reply.text,
+        "cards": reply.cards,
+        "trace": [
+            {"name": call.name, "label": call.label, "summary": call.summary,
+             "arguments": call.arguments}
+            for call in reply.trace
+        ],
+        "used_model": reply.used_model,
+    }

@@ -77,8 +77,47 @@ class TestConversation:
     async def test_opens_with_a_greeting_and_options(self):
         r = await turn(None)
         assert len(r["messages"]) == 2          # greeting, then one question
-        assert len(r["chips"]) == 2             # never a bare text prompt
+        assert len(r["chips"]) >= 6             # never a bare text prompt
         assert r["done"] is False
+
+    @pytest.mark.asyncio
+    async def test_opening_does_not_assume_the_person_wants_money(self):
+        """The failure this replaced: it opened with "what do you need the money
+        for?" and offered a business or a course.
+
+        Most of the corpus is not money — a pension, a house, a scholarship, a
+        widow's allowance. Being asked about project cost is how someone who
+        needs a roof concludes this product is not for them and leaves."""
+        r = await turn(None)
+        greeting = r["messages"][0]["text"].lower()
+        question = r["messages"][1]["text"].lower()
+        assert "money" not in question
+        values = {c["value"] for c in r["chips"]}
+        assert {"housing", "pension", "health", "study"} <= values
+        # The greeting should name more than credit.
+        assert any(word in greeting for word in ("pension", "scholarship", "housing"))
+
+    @pytest.mark.asyncio
+    async def test_welfare_need_never_asks_about_project_cost(self):
+        """Someone wanting a pension is never asked what their project costs."""
+        r = await turn(None)
+        sid = r["session_id"]
+        asked = []
+        for message in ["pension", "SC", "ballia"]:
+            r = await turn(sid, message)
+            asked.append(r["step"])
+        assert "cost" not in asked and "income" not in asked
+        assert r["done"] is True
+        assert any(c["kind"] == "matches" for c in r["cards"])
+
+    @pytest.mark.asyncio
+    async def test_credit_need_still_reaches_the_loan_engine(self):
+        r = await turn(None)
+        sid = r["session_id"]
+        for message in ["business", "120000", "280000", "SC", "female", "ballia"]:
+            r = await turn(sid, message)
+        assert r["done"] is True
+        assert [c["kind"] for c in r["cards"]].count("scheme") == 3
 
     @pytest.mark.asyncio
     async def test_hindi_is_detected_from_the_first_message(self):
@@ -102,7 +141,7 @@ class TestConversation:
         r = await turn(None)
         sid = r["session_id"]
         r = await turn(sid, "asdfghjkl")
-        assert r["step"] == "purpose"           # did not advance
+        assert r["step"] == "need"              # did not advance
         assert r["chips"]                       # options still offered
         assert len(r["messages"]) == 2          # apology, then the question again
 
@@ -146,7 +185,7 @@ class TestConversation:
         sid = r["session_id"]
         await turn(sid, "business")
         r = await turn(sid, "", restart=True)
-        assert r["step"] == "purpose"
+        assert r["step"] == "need"
 
     @pytest.mark.asyncio
     async def test_free_text_purpose_is_understood(self):

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ArrowRight, Loader2, LocateFixed, MapPin } from "lucide-react";
 
+import { useLanguage } from "@/components/language-provider";
 import { OptionRow } from "@/components/option-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ export function CheckForm({
   meta: CatalogMeta;
   className?: string;
 }) {
+  const { t } = useLanguage();
   const router = useRouter();
   const [answers, setAnswers] = useState<Answers>({});
   const [matched, setMatched] = useState<number | null>(null);
@@ -95,8 +97,8 @@ export function CheckForm({
       >
         <Section
           step={1}
-          title="What do you need help with?"
-          hint="Pick as many as apply, or none to see everything."
+          title={t("check.s1.title")}
+          hint={t("check.s1.hint")}
         >
           <div className="flex flex-wrap gap-2">
             {meta.categories.map((category) => {
@@ -133,8 +135,8 @@ export function CheckForm({
 
         <Section
           step={2}
-          title="Where do you live?"
-          hint="Most schemes are run by one state, so this matters more than anything else."
+          title={t("check.s2.title")}
+          hint={t("check.s2.hint")}
         >
           <LocationPicker
             meta={meta}
@@ -150,7 +152,7 @@ export function CheckForm({
           />
           <div className="mt-5">
             <OptionRow
-              label="Is that a village or a town?"
+              label={t("check.q.residence")}
               options={RESIDENCE}
               value={answers.residence}
               onSelect={(value) => set("residence", value)}
@@ -158,16 +160,16 @@ export function CheckForm({
           </div>
         </Section>
 
-        <Section step={3} title="About you">
+        <Section step={3} title={t("check.s3.title")}>
           <div className="space-y-5">
             <OptionRow
-              label="Which community do you belong to?"
+              label={t("check.q.caste")}
               options={CASTES}
               value={answers.caste}
               onSelect={(value) => set("caste", value)}
             />
             <OptionRow
-              label="Gender"
+              label={t("check.q.gender")}
               options={GENDERS}
               value={answers.gender}
               onSelect={(value) => set("gender", value)}
@@ -175,7 +177,7 @@ export function CheckForm({
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="age" className="text-sm font-medium">
-                  Age
+                  {t("check.q.age")}
                 </Label>
                 <Input
                   id="age"
@@ -196,7 +198,7 @@ export function CheckForm({
               </div>
               <div>
                 <Label htmlFor="income" className="text-sm font-medium">
-                  Household income for a year
+                  {t("check.q.income")}
                 </Label>
                 <Input
                   id="income"
@@ -215,7 +217,7 @@ export function CheckForm({
                   }}
                 />
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  Everyone in the house together, not only what you earn.
+                  {t("check.q.income.hint")}
                 </p>
               </div>
             </div>
@@ -224,43 +226,43 @@ export function CheckForm({
 
         <Section
           step={4}
-          title="Anything else that applies"
-          hint="Each of these unlocks schemes reserved for people it applies to."
+          title={t("check.s4.title")}
+          hint={t("check.s4.hint")}
         >
           <div className="space-y-5">
             <OptionRow
-              label="Do you have a BPL card?"
+              label={t("check.q.bpl")}
               options={YES_NO}
               value={answers.is_bpl}
               onSelect={(value) => set("is_bpl", value)}
             />
             <OptionRow
-              label="Does anyone in the household have a disability?"
+              label={t("check.q.disability")}
               options={YES_NO}
               value={answers.disability}
               onSelect={(value) => set("disability", value)}
             />
             <OptionRow
-              label="Are you studying?"
+              label={t("check.q.student")}
               options={YES_NO}
               value={answers.is_student}
               onSelect={(value) => set("is_student", value)}
             />
             <OptionRow
-              label="Marital status"
+              label={t("check.q.marital")}
               options={MARITAL}
               value={answers.marital_status}
               onSelect={(value) => set("marital_status", value)}
             />
             <OptionRow
-              label="Work"
+              label={t("check.q.employment")}
               options={EMPLOYMENT}
               value={answers.employment_status}
               onSelect={(value) => set("employment_status", value)}
             />
             <div>
               <Label htmlFor="occupation" className="text-sm font-medium">
-                What work do you do?
+                {t("check.q.occupation")}
               </Label>
               <select
                 id="occupation"
@@ -276,7 +278,7 @@ export function CheckForm({
                   });
                 }}
               >
-                <option value="">Not listed / prefer not to say</option>
+                <option value="">{t("check.occupation.none")}</option>
                 {OCCUPATIONS.map((occupation) => (
                   <option key={occupation} value={occupation}>
                     {occupation}
@@ -296,7 +298,7 @@ export function CheckForm({
         <div className="sticky top-24 space-y-4">
           <div className="card-quiet p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              Matching so far
+              {t("check.matching")}
             </p>
             <p className="mt-2 font-display text-4xl font-bold tabular-nums text-primary">
               {counting && matched === null ? (
@@ -307,14 +309,13 @@ export function CheckForm({
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               {answered === 0
-                ? "schemes, before you narrow anything down"
+                ? t("check.matching.none")
                 : `schemes, from ${answered} ${answered === 1 ? "answer" : "answers"}`}
             </p>
 
             {targeted > 0 ? (
               <p className="mt-3 rounded-lg bg-gold-soft px-3 py-2 text-sm font-medium text-gold-ink">
-                {targeted.toLocaleString("en-IN")} of them are aimed at people
-                like you
+                {t("check.matching.targeted", { count: targeted.toLocaleString("en-IN") })}
               </p>
             ) : null}
 
@@ -326,8 +327,7 @@ export function CheckForm({
           </div>
 
           <p className="px-1 text-xs leading-relaxed text-muted-foreground">
-            Nothing here is stored. The answers live in this page only, and go no
-            further than the matching request.
+            {t("check.privacy")}
           </p>
         </div>
       </aside>
@@ -344,6 +344,7 @@ function SubmitButton({
   onClick: () => void;
   className?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <Button
       type="submit"
@@ -355,11 +356,11 @@ function SubmitButton({
       {navigating ? (
         <>
           <Loader2 className="size-4 animate-spin" />
-          Finding schemes…
+          {t("check.submitting")}
         </>
       ) : (
         <>
-          Show my schemes
+          {t("check.submit")}
           <ArrowRight className="size-4" />
         </>
       )}
@@ -410,6 +411,7 @@ function LocationPicker({
   state?: string;
   onState: (state?: string) => void;
 }) {
+  const { t } = useLanguage();
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pin, setPin] = useState("");
@@ -420,8 +422,15 @@ function LocationPicker({
   );
 
   const useMyLocation = () => {
+    // Geolocation is gated on a secure context. Over plain HTTP the API is
+    // still present but refuses without ever prompting, so checking for the
+    // object alone would leave the person tapping a button that does nothing.
+    if (!window.isSecureContext) {
+      setStatus(t("check.location.insecure"));
+      return;
+    }
     if (!("geolocation" in navigator)) {
-      setStatus("This browser cannot share your location. Use the PIN code instead.");
+      setStatus(t("check.location.denied"));
       return;
     }
     setBusy(true);
@@ -440,17 +449,17 @@ function LocationPicker({
               place.district ? `${place.district}, ${place.state}` : place.state,
             );
           } else {
-            setStatus("We could not place those coordinates. Try your PIN code.");
+            setStatus(t("check.location.failed"));
           }
         } catch {
-          setStatus("The lookup failed. Try your PIN code instead.");
+          setStatus(t("check.location.failed"));
         } finally {
           setBusy(false);
         }
       },
       () => {
         setBusy(false);
-        setStatus("Location was not shared. Your PIN code works just as well.");
+        setStatus(t("check.location.denied"));
       },
       { timeout: 10000, maximumAge: 300000 },
     );
@@ -468,10 +477,10 @@ function LocationPicker({
           place.district ? `${place.district}, ${place.state}` : place.state,
         );
       } else {
-        setStatus("That PIN code did not match. Pick your state below.");
+        setStatus(t("check.location.badpin"));
       }
     } catch {
-      setStatus("The lookup failed. Pick your state below.");
+      setStatus(t("check.location.failed"));
     } finally {
       setBusy(false);
     }
@@ -492,17 +501,17 @@ function LocationPicker({
           ) : (
             <LocateFixed className="size-4" />
           )}
-          Use my location
+          {t("check.location.use")}
         </Button>
 
         <div className="flex gap-2">
           <Input
             inputMode="numeric"
             maxLength={6}
-            placeholder="or PIN code"
+            placeholder={t("check.location.pin")}
             className="h-11 w-40 bg-card text-base"
             value={pin}
-            aria-label="PIN code"
+            aria-label={t("check.location.pin")}
             onChange={(event) => {
               const value = event.target.value.replace(/\D/g, "").slice(0, 6);
               setPin(value);
@@ -521,7 +530,7 @@ function LocationPicker({
 
       <div className="mt-4">
         <Label htmlFor="state" className="text-sm font-medium">
-          State
+          {t("check.location.state")}
         </Label>
         <select
           id="state"
@@ -529,7 +538,7 @@ function LocationPicker({
           value={state ?? ""}
           onChange={(event) => onState(event.target.value || undefined)}
         >
-          <option value="">All of India</option>
+          <option value="">{t("check.location.all")}</option>
           {states.map((name) => (
             <option key={name} value={name}>
               {name}
@@ -537,7 +546,7 @@ function LocationPicker({
           ))}
         </select>
         <p className="mt-1.5 text-xs text-muted-foreground">
-          Central schemes are always included alongside your state.
+          {t("check.location.central")}
         </p>
       </div>
     </div>

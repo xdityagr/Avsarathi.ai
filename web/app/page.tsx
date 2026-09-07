@@ -12,68 +12,29 @@ import {
 import { CategoryGrid } from "@/components/category-grid";
 import { ButtonLink } from "@/components/ui/button-link";
 import { getCatalogMeta } from "@/lib/api";
+import { formatNumber } from "@/lib/i18n";
+import { getLang } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n";
 
 const STEPS = [
-  {
-    icon: FileSearch,
-    title: "Tell us what you can",
-    body:
-      "Caste, district, household income, what you need help with. Every question " +
-      "is optional — leaving one blank never hides a scheme from you.",
-  },
-  {
-    icon: BadgeCheck,
-    title: "See what you qualify for",
-    body:
-      "Matched against the published rules of every scheme in the corpus, with " +
-      "the reason for each match shown next to it.",
-  },
-  {
-    icon: MapPin,
-    title: "Go and apply",
-    body:
-      "The nearest office that actually handles your scheme, its distance, and " +
-      "the documents to carry. Then track what happens next.",
-  },
-];
+  { icon: FileSearch, title: "home.step1.title", body: "home.step1.body" },
+  { icon: BadgeCheck, title: "home.step2.title", body: "home.step2.body" },
+  { icon: MapPin, title: "home.step3.title", body: "home.step3.body" },
+] as const;
 
 const DIFFERENCES = [
-  {
-    icon: ShieldCheck,
-    title: "No model decides who qualifies",
-    body:
-      "Eligibility is arithmetic against published rules, so it is the same every " +
-      "time and we can show our working. The AI writes explanations; it never " +
-      "casts a vote on your application.",
-  },
-  {
-    icon: Calculator,
-    title: "The real cost, in rupees",
-    body:
-      "NSFDC lends at 6%. A moneylender charges 60% a year or more. We show both " +
-      "on the same screen, with the instalment and the total you repay.",
-  },
-  {
-    icon: Banknote,
-    title: "Honest about the last mile",
-    body:
-      "Money moves NSFDC → state agency → you, and only the branch knows where " +
-      "yours is. We give you a timeline, the escalation path, and a drafted " +
-      "grievance when it stalls — not a fake tracker.",
-  },
-  {
-    icon: MessageCircle,
-    title: "Works on WhatsApp",
-    body:
-      "Not everyone will install an app or read comfortably. The same engine " +
-      "answers on WhatsApp, in Hindi, Marathi, Bengali and Tamil.",
-  },
-];
+  { icon: ShieldCheck, title: "home.diff1.title", body: "home.diff1.body" },
+  { icon: Calculator, title: "home.diff2.title", body: "home.diff2.body" },
+  { icon: Banknote, title: "home.diff3.title", body: "home.diff3.body" },
+  { icon: MessageCircle, title: "home.diff4.title", body: "home.diff4.body" },
+] as const;
 
 export default async function HomePage() {
-  const meta = await getCatalogMeta();
+  const [meta, lang] = await Promise.all([getCatalogMeta(), getLang()]);
+  const t = translator(lang);
   const schemeCount = meta.total || 4736;
   const stateCount = meta.states.filter((s) => s.name !== "All").length || 36;
+  const count = formatNumber(lang, schemeCount);
 
   return (
     <>
@@ -88,28 +49,22 @@ export default async function HomePage() {
             <div>
               <p className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-gold" />
-                Built for the Ministry of Social Justice &amp; Empowerment
-                problem statement
+                {t("home.badge")}
               </p>
 
               <h1 className="mt-6 text-balance font-display text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
-                The scheme exists.
+                {t("home.h1.line1")}
                 <br />
-                <span className="text-primary">Nobody told her about it.</span>
+                <span className="text-primary">{t("home.h1.line2")}</span>
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-                India runs {schemeCount.toLocaleString("en-IN")} welfare and
-                credit schemes for Scheduled Caste, Scheduled Tribe, OBC and
-                other marginalised households — housing, pensions, scholarships,
-                medical help, business loans. Avsarathi finds the ones{" "}
-                <em className="not-italic text-foreground">you</em> qualify for,
-                explains them in your language, and shows you where to go.
+                {t("home.lede", { count })}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <ButtonLink href="/check" size="lg" className="h-12 px-6 text-base">
-                  Find my schemes
+                  {t("home.cta.primary")}
                   <ArrowRight className="size-4" />
                 </ButtonLink>
                 <ButtonLink
@@ -118,12 +73,12 @@ export default async function HomePage() {
                   variant="outline"
                   className="h-12 bg-card px-6 text-base"
                 >
-                  Browse all schemes
+                  {t("home.cta.secondary")}
                 </ButtonLink>
               </div>
 
               <p className="mt-4 text-sm text-muted-foreground">
-                No account. No Aadhaar number. Nothing saved unless you ask.
+                {t("home.reassurance")}
               </p>
             </div>
 
@@ -136,10 +91,10 @@ export default async function HomePage() {
       <section className="border-b border-border bg-card">
         <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-border sm:grid-cols-4">
           {[
-            { value: schemeCount.toLocaleString("en-IN"), label: "schemes in the corpus" },
-            { value: String(meta.categories.length || 15), label: "categories of need" },
-            { value: String(stateCount), label: "states and UTs" },
-            { value: "5", label: "languages" },
+            { value: count, label: t("home.stat.schemes") },
+            { value: formatNumber(lang, meta.categories.length || 15), label: t("home.stat.categories") },
+            { value: formatNumber(lang, stateCount), label: t("home.stat.states") },
+            { value: formatNumber(lang, 5), label: t("home.stat.languages") },
           ].map((stat) => (
             <div key={stat.label} className="bg-card px-4 py-8 text-center">
               <dt className="font-display text-3xl font-bold text-primary sm:text-4xl">
@@ -154,7 +109,7 @@ export default async function HomePage() {
       {/* --------------------------------------------------------- How it works */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <h2 className="font-display text-3xl font-bold sm:text-4xl">
-          Three steps, and none of them is a form you can&apos;t read
+          {t("home.steps.h2")}
         </h2>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {STEPS.map((step, index) => (
@@ -164,12 +119,12 @@ export default async function HomePage() {
                   <step.icon className="size-5" />
                 </span>
                 <span className="font-display text-sm font-semibold text-muted-foreground">
-                  Step {index + 1}
+                  {t("home.step")} {index + 1}
                 </span>
               </div>
-              <h3 className="mt-4 text-lg font-semibold">{step.title}</h3>
+              <h3 className="mt-4 text-lg font-semibold">{t(step.title)}</h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {step.body}
+                {t(step.body)}
               </p>
             </div>
           ))}
@@ -182,12 +137,10 @@ export default async function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-2xl">
               <h2 className="font-display text-3xl font-bold sm:text-4xl">
-                Not just loans and courses
+                {t("home.categories.h2")}
               </h2>
               <p className="mt-3 text-muted-foreground">
-                A household needs a roof, a pension, a scholarship, a widow&apos;s
-                allowance and treatment money — often at the same time. Every
-                category below is searchable.
+                {t("home.categories.lede")}
               </p>
             </div>
             <ButtonLink
@@ -195,7 +148,7 @@ export default async function HomePage() {
               variant="outline"
               className="h-10 bg-paper px-4"
             >
-              See all {schemeCount.toLocaleString("en-IN")}
+              {t("home.categories.cta", { count })}
               <ArrowRight className="size-4" />
             </ButtonLink>
           </div>
@@ -206,7 +159,7 @@ export default async function HomePage() {
       {/* --------------------------------------------------------- Differences */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
         <h2 className="font-display text-3xl font-bold sm:text-4xl">
-          Why this is different from a search box
+          {t("home.diff.h2")}
         </h2>
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
           {DIFFERENCES.map((item) => (
@@ -215,9 +168,9 @@ export default async function HomePage() {
                 <item.icon className="size-5" />
               </span>
               <div>
-                <h3 className="text-lg font-semibold">{item.title}</h3>
+                <h3 className="text-lg font-semibold">{t(item.title)}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {item.body}
+                  {t(item.body)}
                 </p>
               </div>
             </div>
@@ -231,12 +184,10 @@ export default async function HomePage() {
           <div className="flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
             <div className="max-w-2xl">
               <h2 className="font-display text-3xl font-bold sm:text-4xl">
-                Find out in two minutes
+                {t("home.final.h2")}
               </h2>
               <p className="mt-3 text-primary-foreground/80">
-                Answer what you are comfortable answering. You will get a ranked
-                list with the reason for every match, and the nearest place to
-                apply.
+                {t("home.final.body")}
               </p>
             </div>
             <ButtonLink
@@ -244,7 +195,7 @@ export default async function HomePage() {
               size="lg"
               className="h-12 bg-gold px-8 text-base font-semibold text-gold-ink hover:bg-gold/90"
             >
-              Start
+              {t("home.final.cta")}
               <ArrowRight className="size-4" />
             </ButtonLink>
           </div>

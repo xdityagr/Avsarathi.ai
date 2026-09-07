@@ -1,26 +1,33 @@
 import Link from "next/link";
 
 import { Logo } from "@/components/logo";
+import { getT } from "@/lib/i18n/server";
+import { DICTIONARY, type StringKey } from "@/lib/i18n/dictionary";
+
+/** Official names — myScheme, NSFDC, PFMS — are never translated. */
+function isKey(value: string): value is StringKey {
+  return value in DICTIONARY;
+}
 
 const COLUMNS = [
   {
-    title: "Find",
+    title: "footer.find",
     links: [
-      { href: "/check", label: "Check eligibility" },
-      { href: "/schemes", label: "Browse all schemes" },
-      { href: "/credit", label: "NSFDC loans" },
+      { href: "/check", label: "nav.check" },
+      { href: "/schemes", label: "nav.schemes" },
+      { href: "/credit", label: "nav.credit" },
     ],
   },
   {
-    title: "Act",
+    title: "footer.act",
     links: [
-      { href: "/partners", label: "Where to apply" },
-      { href: "/track", label: "Track an application" },
-      { href: "/chat", label: "Ask a question" },
+      { href: "/partners", label: "nav.partners" },
+      { href: "/track", label: "nav.track" },
+      { href: "/chat", label: "nav.chat" },
     ],
   },
   {
-    title: "Sources",
+    title: "footer.sources",
     links: [
       { href: "https://www.myscheme.gov.in", label: "myScheme (Govt. of India)" },
       { href: "https://nsfdc.nic.in", label: "NSFDC" },
@@ -29,7 +36,9 @@ const COLUMNS = [
   },
 ];
 
-export function SiteFooter() {
+export async function SiteFooter() {
+  const t = await getT();
+
   return (
     <footer className="border-t border-border bg-card">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -37,16 +46,14 @@ export function SiteFooter() {
           <div className="max-w-xs">
             <Logo />
             <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Scheme information is reproduced from official government sources
-              with a link back to each one. We never decide your eligibility with
-              a language model.
+              {t("footer.tagline")}
             </p>
           </div>
 
           {COLUMNS.map((column) => (
             <div key={column.title}>
               <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                {column.title}
+                {isKey(column.title) ? t(column.title) : column.title}
               </h2>
               <ul className="mt-4 space-y-2.5">
                 {column.links.map((link) => (
@@ -55,7 +62,7 @@ export function SiteFooter() {
                       href={link.href}
                       className="text-sm text-foreground/80 underline-offset-4 hover:text-primary hover:underline"
                     >
-                      {link.label}
+                      {isKey(link.label) ? t(link.label) : link.label}
                     </Link>
                   </li>
                 ))}
@@ -65,10 +72,7 @@ export function SiteFooter() {
         </div>
 
         <p className="mt-10 border-t border-border pt-6 text-xs leading-relaxed text-muted-foreground">
-          Avsarathi is not a government website and cannot approve, sanction or
-          disburse anything. It helps you find what you are entitled to and shows
-          you where to go. Always confirm details with the office named on the
-          scheme page.
+          {t("footer.disclaimer")}
         </p>
       </div>
     </footer>

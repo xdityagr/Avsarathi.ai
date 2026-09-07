@@ -6,7 +6,8 @@
     "dev": "next dev -H 0.0.0.0 -p 3100",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3100",
-    "lint": "eslint"
+    "lint": "eslint",
+    "dev:https": "next dev -H 0.0.0.0 -p 3100 --experimental-https --experimental-https-key certs/dev-key.pem --experimental-https-cert certs/dev-cert.pem"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Check, Languages } from "lucide-react";
 
-import { LANGUAGES, useLanguage, type Lang } from "@/components/language-provider";
+import { LANGUAGE_META, useLanguage } from "@/components/language-provider";
+import { LANGS, type Lang } from "@/lib/i18n/config";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
  * English-labelled language menu useless to exactly the person who needs it.
  */
 export function LanguageSwitcher({ className }: { className?: string }) {
-  const { lang, setLang } = useLanguage();
+  const { lang, setLang, t, switching } = useLanguage();
   const [open, setOpen] = useState(false);
 
   return (
@@ -22,11 +23,12 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-label="Change language"
-        className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-sm font-medium transition-colors hover:bg-accent"
+        aria-label={t("lang.change")}
+        disabled={switching}
+        className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
       >
         <Languages className="size-4 text-muted-foreground" />
-        <span>{LANGUAGES[lang].native}</span>
+        <span>{LANGUAGE_META[lang].native}</span>
       </button>
 
       {open ? (
@@ -42,7 +44,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
             role="listbox"
             className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
           >
-            {(Object.keys(LANGUAGES) as Lang[]).map((code) => (
+            {(LANGS as readonly Lang[]).map((code) => (
               <li key={code}>
                 <button
                   type="button"
@@ -58,7 +60,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
                     code === lang && "font-semibold text-primary",
                   )}
                 >
-                  <span>{LANGUAGES[code].native}</span>
+                  <span>{LANGUAGE_META[code].native}</span>
                   {code === lang ? <Check className="size-4" /> : null}
                 </button>
               </li>

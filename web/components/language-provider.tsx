@@ -1,129 +1,71 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { createContext, useCallback, useContext, useMemo, useTransition } from "react";
+
 import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-} from "react";
+  DEFAULT_LANG,
+  LANG_COOKIE,
+  LANGUAGE_META,
+  type Lang,
+} from "@/lib/i18n/config";
+import { translator } from "@/lib/i18n";
+import type { StringKey } from "@/lib/i18n/dictionary";
 
-export const LANGUAGES = {
-  en: { name: "English", native: "English" },
-  hi: { name: "Hindi", native: "हिन्दी" },
-  mr: { name: "Marathi", native: "मराठी" },
-  bn: { name: "Bengali", native: "বাংলা" },
-  ta: { name: "Tamil", native: "தமிழ்" },
-} as const;
-
-export type Lang = keyof typeof LANGUAGES;
-
-const STORAGE_KEY = "avsarathi.lang";
-const NO_STRINGS: Record<string, string> = {};
-
-/* ---------------------------------------------------------------------------
- * The chosen language lives in localStorage, which makes it external state.
- *
- * Reading it in an effect and calling setState would render English first and
- * correct it a moment later — a visible flicker in a language the reader may
- * not have. `useSyncExternalStore` is built for exactly this: one snapshot for
- * the server, another for the browser, no cascading render. It also syncs
- * across tabs for free, via the storage event.
- * ------------------------------------------------------------------------- */
-
-const listeners = new Set<() => void>();
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener("storage", listener);
-  };
-}
-
-function readStoredLang(): Lang {
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored && stored in LANGUAGES) return stored as Lang;
-  } catch {
-    // Private browsing, or storage blocked. English is a fine default.
-  }
-  return "en";
-}
-
-// The server has no idea who is reading, so it always renders English and the
-// browser corrects it on the first paint.
-const serverSnapshot = (): Lang => "en";
+export { LANGUAGE_META };
 
 interface LanguageValue {
   lang: Lang;
   setLang: (lang: Lang) => void;
-  /** UI strings for the chosen language; empty for English and while loading. */
-  strings: Record<string, string>;
-  t: (key: string, fallback?: string) => string;
+  switching: boolean;
+  t: (key: StringKey, vars?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageValue>({
-  lang: "en",
+  lang: DEFAULT_LANG,
   setLang: () => {},
-  strings: NO_STRINGS,
-  t: (key, fallback) => fallback ?? key,
+  switching: false,
+  t: translator(DEFAULT_LANG),
 });
 
 export function useLanguage() {
   return useContext(LanguageContext);
 }
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const lang = useSyncExternalStore(subscribe, readStoredLang, serverSnapshot);
+/**
+ * The chosen language, seeded by the server.
+ *
+ * The value arrives as a prop from the root layout, which read it from the
+ * cookie — so the first paint is already in the right language and there is no
+ * flicker. Changing it writes the cookie and refreshes the route, which is what
+ * makes server-rendered pages (the scheme catalogue, every detail page) come
+ * back translated rather than only the interactive bits.
+ */
+export function LanguageProvider({
+  lang,
+  children,
+}: {
+  lang: Lang;
+  children: React.ReactNode;
+}) {
+  const router = useRouter();
+  const [switching, startSwitching] = useTransition();
 
-  // Catalogues are cached per language, so switching back and forth costs one
-  // fetch each rather than one per switch.
-  const [catalogues, setCatalogues] = useState<
-    Record<string, Record<string, string>>
-  >({});
-
-  useEffect(() => {
-    if (lang === "en" || catalogues[lang]) return;
-    let cancelled = false;
-    fetch(`/api/i18n/${lang}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.strings) {
-          setCatalogues((prev) => ({ ...prev, [lang]: data.strings }));
-        }
-      })
-      .catch(() => {
-        // A missing catalogue falls back to English rather than blank text.
+  const setLang = useCallback(
+    (next: Lang) => {
+      // A year, because someone who has chosen once should not choose again.
+      document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+      document.documentElement.lang = next;
+      startSwitching(() => {
+        router.refresh();
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [lang, catalogues]);
-
-  const setLang = useCallback((next: Lang) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      // Not remembering the choice is survivable; ignoring the tap is not.
-    }
-    document.documentElement.lang = next;
-    for (const listener of listeners) listener();
-  }, []);
-
-  const strings = lang === "en" ? NO_STRINGS : catalogues[lang] ?? NO_STRINGS;
+    },
+    [router],
+  );
 
   const value = useMemo<LanguageValue>(
-    () => ({
-      lang,
-      setLang,
-      strings,
-      t: (key, fallback) => strings[key] ?? fallback ?? key,
-    }),
-    [lang, setLang, strings],
+    () => ({ lang, setLang, switching, t: translator(lang) }),
+    [lang, setLang, switching],
   );
 
   return (

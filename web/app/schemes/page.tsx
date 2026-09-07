@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
 import { browseSchemes, getCatalogMeta, type SchemeCard } from "@/lib/api";
+import { formatNumber } from "@/lib/i18n";
+import { getLang } from "@/lib/i18n/server";
+import { translator } from "@/lib/i18n";
 
 export const metadata = {
   title: "All schemes",
@@ -32,10 +35,12 @@ export default async function SchemesPage({
   const level = one(params.level);
   const page = Math.max(1, Number(one(params.page) ?? 1) || 1);
 
-  const [meta, results] = await Promise.all([
+  const [meta, results, lang] = await Promise.all([
     getCatalogMeta(),
     browseSchemes({ q, category, state, level, page, page_size: PAGE_SIZE }),
+    getLang(),
   ]);
+  const t = translator(lang);
 
   const lastPage = Math.max(1, Math.ceil(results.total / PAGE_SIZE));
   const filtered = Boolean(q || category || state || level);
@@ -44,12 +49,10 @@ export default async function SchemesPage({
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
       <header className="max-w-3xl">
         <h1 className="font-display text-3xl font-bold sm:text-4xl">
-          Every scheme we hold
+          {t("schemes.h1")}
         </h1>
         <p className="mt-3 text-muted-foreground">
-          {meta.total.toLocaleString("en-IN")} central and state schemes,
-          reproduced from official sources with a link back to each one. Search
-          without telling us anything about yourself.
+          {t("schemes.lede", { count: formatNumber(lang, meta.total) })}
         </p>
       </header>
 
@@ -64,13 +67,13 @@ export default async function SchemesPage({
           <Input
             name="q"
             defaultValue={q}
-            placeholder="Scholarship, pension, housing, loan…"
+            placeholder={t("schemes.search.placeholder")}
             className="h-11 bg-card pl-9 text-base"
-            aria-label="Search schemes"
+            aria-label={t("schemes.search.button")}
           />
         </div>
         <Button type="submit" size="lg" className="h-11 px-6">
-          Search
+          {t("schemes.search.button")}
         </Button>
       </form>
 
@@ -78,7 +81,7 @@ export default async function SchemesPage({
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <h2 className="flex items-center gap-2 text-sm font-semibold">
             <SlidersHorizontal className="size-4" />
-            Filter
+            {t("schemes.filter")}
           </h2>
           <SchemeFilters
             meta={meta}
@@ -91,14 +94,14 @@ export default async function SchemesPage({
           <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border pb-3">
             <p className="text-sm text-muted-foreground">
               {results.total === 0 ? (
-                "No schemes match those filters"
+                t("schemes.none")
               ) : (
                 <>
                   <span className="font-semibold text-foreground tabular-nums">
-                    {results.total.toLocaleString("en-IN")}
+                    {formatNumber(lang, results.total)}
                   </span>{" "}
-                  {results.total === 1 ? "scheme" : "schemes"}
-                  {filtered ? " match" : ""} · page {results.page} of {lastPage}
+                  {" "}
+                  {t("schemes.page")} {results.page} {t("schemes.of")} {lastPage}
                 </>
               )}
             </p>
@@ -107,7 +110,7 @@ export default async function SchemesPage({
                 href="/schemes"
                 className="text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
-                Clear filters
+                {t("schemes.filter.clear")}
               </Link>
             ) : null}
           </div>

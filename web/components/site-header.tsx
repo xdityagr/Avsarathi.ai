@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
+import { useLanguage } from "@/components/language-provider";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -12,15 +13,16 @@ import { ButtonLink } from "@/components/ui/button-link";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/check", label: "Check eligibility" },
-  { href: "/schemes", label: "All schemes" },
-  { href: "/credit", label: "Loans" },
-  { href: "/partners", label: "Where to apply" },
-  { href: "/track", label: "Track application" },
-  { href: "/chat", label: "Ask" },
-];
+  { href: "/check", key: "nav.check" },
+  { href: "/schemes", key: "nav.schemes" },
+  { href: "/credit", key: "nav.credit" },
+  { href: "/partners", key: "nav.partners" },
+  { href: "/track", key: "nav.track" },
+  { href: "/chat", key: "nav.chat" },
+] as const;
 
 export function SiteHeader() {
+  const { t } = useLanguage();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -46,7 +48,7 @@ export function SiteHeader() {
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                 )}
               >
-                {item.label}
+                {t(item.key)}
               </Link>
             );
           })}
@@ -55,13 +57,13 @@ export function SiteHeader() {
         <div className="ml-auto flex items-center gap-2 md:ml-0">
           <LanguageSwitcher />
           <ButtonLink href="/check" size="sm" className="hidden sm:inline-flex">
-            Find my schemes
+            {t("nav.cta")}
           </ButtonLink>
           <Button
             variant="ghost"
             size="icon"
             className="md:hidden"
-            aria-label={open ? "Close menu" : "Open menu"}
+            aria-label={open ? t("nav.menu.close") : t("nav.menu.open")}
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
           >
@@ -79,7 +81,7 @@ export function SiteHeader() {
               onClick={() => setOpen(false)}
               className="block rounded-md px-3 py-3 text-base font-medium text-foreground hover:bg-accent"
             >
-              {item.label}
+              {t(item.key)}
             </Link>
           ))}
         </nav>

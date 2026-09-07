@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from src.calculator import MoratoriumType, calculate_emi
+from src.discovery import Facets, discover
 from src.config import SCHEMES, get_settings
 from src.i18n import DEFAULT_LANGUAGE, detect_language, t
 from src.routing import route_partners, utilisation_note
@@ -42,8 +43,34 @@ from src.seed import partners_near
 
 logger = logging.getLogger(__name__)
 
-# Steps, in order. Each is one question.
-STEPS = ["purpose", "cost", "income", "category", "gender", "place", "done"]
+# Two tracks, because "what do you need?" has two very different answers.
+#
+# The first build asked "what do you need the money for?" and offered business
+# or a course. That was written when this was an NSFDC credit tool, and it is
+# wrong for what the product now is: most of the 4,736 schemes are not money at
+# all. A widow needing a pension, a family needing a house, a child needing a
+# scholarship — none of them are asking for a loan, and being asked about
+# project cost is how a person concludes this is not for them and leaves.
+#
+# So the opening asks what kind of help is needed. Credit questions are asked
+# only of people who said they want to borrow.
+STEPS_CREDIT = ["need", "cost", "income", "category", "gender", "place", "done"]
+STEPS_WELFARE = ["need", "category", "place", "done"]
+
+# What people come for, mapped to the corpus's own category strings. The values
+# are exact: a category name we invent filters to nothing.
+NEEDS = [
+    {"id": "business", "track": "credit", "project_type": "business", "category": None},
+    {"id": "study", "track": "welfare", "category": "Education & Learning"},
+    {"id": "housing", "track": "welfare", "category": "Housing & Shelter"},
+    {"id": "pension", "track": "welfare", "category": "Social welfare & Empowerment"},
+    {"id": "health", "track": "welfare", "category": "Health & Wellness"},
+    {"id": "job", "track": "welfare", "category": "Skills & Employment"},
+    {"id": "farming", "track": "welfare", "category": "Agriculture,Rural & Environment"},
+    {"id": "everything", "track": "welfare", "category": None},
+]
+
+NEED_BY_ID = {need["id"]: need for need in NEEDS}
 
 PLACES = [
     {"id": "ballia", "label": "Ballia, Uttar Pradesh", "lat": 25.7585, "lon": 84.1487, "state": "Uttar Pradesh"},
@@ -58,8 +85,13 @@ PLACES = [
 class Session:
     session_id: str
     language: str = DEFAULT_LANGUAGE
-    step: str = "purpose"
+    step: str = "need"
+    track: str = "welfare"
     answers: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def steps(self) -> list[str]:
+        return STEPS_CREDIT if self.track == "credit" else STEPS_WELFARE
 
 
 _SESSIONS: dict[str, Session] = {}
@@ -154,10 +186,9 @@ def _question(session: Session) -> dict:
     lang = session.language
     step = session.step
 
-    if step == "purpose":
-        return {"text": t("ask_purpose", lang), "chips": [
-            _chip("business", t("opt_business", lang)),
-            _chip("education", t("opt_education", lang)),
+    if step == "need":
+        return {"text": t("ask_need", lang), "chips": [
+            _chip(need["id"], t(f"need_{need['id']}", lang)) for need in NEEDS
         ]}
 
     if step == "cost":
@@ -194,19 +225,33 @@ def _question(session: Session) -> dict:
 
 
 def _advance(session: Session) -> None:
-    session.step = STEPS[min(STEPS.index(session.step) + 1, len(STEPS) - 1)]
+    steps = session.steps
+    session.step = steps[min(steps.index(session.step) + 1, len(steps) - 1)]
 
 
 def _accept(session: Session, message: str) -> bool:
     """Record an answer for the current step. False when it can't be read."""
     step, text = session.step, (message or "").strip()
 
-    if step == "purpose":
-        value = text if text in ("business", "education") else _match_words(text, _PURPOSE_WORDS)
-        if not value:
+    if step == "need":
+        need = NEED_BY_ID.get(text.lower())
+        if need is None:
+            # Free text: fall back to the old business/course matcher, which
+            # reads phrases like "I want to open a shop".
+            guessed = _match_words(text, _PURPOSE_WORDS)
+            if guessed == "business":
+                need = NEED_BY_ID["business"]
+            elif guessed == "education":
+                need = NEED_BY_ID["study"]
+        if need is None:
             return False
-        session.answers["project_type"] = value
-        # Remember the phrasing — it is what the person actually wants to do.
+
+        session.track = need["track"]
+        session.answers["need"] = need["id"]
+        if need.get("category"):
+            session.answers["scheme_category"] = need["category"]
+        if need.get("project_type"):
+            session.answers["project_type"] = need["project_type"]
         session.answers.setdefault("purpose_text", text)
         return True
 
@@ -247,8 +292,53 @@ def _accept(session: Session, message: str) -> bool:
 # Results
 # ---------------------------------------------------------------------------
 
+async def _build_welfare_results(session: Session) -> tuple[str, list[dict]]:
+    """Discovery for people who did not come here to borrow.
+
+    Most schemes are not loans, so most conversations should end here: a ranked
+    list of what this person is entitled to, with the reason each one matched.
+    """
+    lang = session.language
+    a = session.answers
+    place = a.get("place") or {}
+
+    facets = Facets(
+        caste=(a.get("category") or "").lower() or None,
+        state=place.get("state"),
+        categories=[a["scheme_category"]] if a.get("scheme_category") else [],
+    )
+    result = discover(facets, limit=6)
+
+    if not result.matches:
+        return t("welfare_none", lang), []
+
+    cards: list[dict] = [{
+        "kind": "matches",
+        "total": result.total_matched,
+        "targeted": result.total_targeted,
+        "items": [
+            {
+                "name": m.name.strip(),
+                "slug": m.slug,
+                "state": m.state,
+                "strength": m.strength.value,
+                "matched_on": m.matched_on,
+            }
+            for m in result.matches[:6]
+        ],
+    }]
+    cards.append({
+        "kind": "notice", "tone": "quiet",
+        "body": t("welfare_note", lang),
+    })
+    return t("welfare_intro", lang), cards
+
+
 async def _build_results(session: Session) -> tuple[str, list[dict]]:
     """Run the engine and turn the outcome into cards."""
+    if session.track != "credit":
+        return await _build_welfare_results(session)
+
     lang = session.language
     a = session.answers
     profile = UserProfile(
@@ -387,7 +477,8 @@ async def turn(
     session = get_session(session_id)
 
     if restart:
-        session.step = "purpose"
+        session.step = "need"
+        session.track = "welfare"
         session.answers = {}
 
     if language and language in ("en", "hi", "mr", "bn", "ta"):
@@ -400,7 +491,7 @@ async def turn(
             session.language = detected
 
     lang = session.language
-    opening = not message and not session.answers and session.step == "purpose"
+    opening = not message and not session.answers and session.step == "need"
 
     if opening:
         question = _question(session)
@@ -412,7 +503,8 @@ async def turn(
         }
 
     if session.step == "done":
-        session.step = "purpose"
+        session.step = "need"
+        session.track = "welfare"
         session.answers = {}
         question = _question(session)
         return {

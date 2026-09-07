@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local development TLS material — regenerate with the openssl command in
+# certs/openssl.cnf rather than sharing a private key.
+/certs/*.pem
