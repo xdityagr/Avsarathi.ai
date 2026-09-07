@@ -57,12 +57,35 @@ class TestLanguage:
     def test_ascii_is_not_guessed(self):
         assert detect_language("I want a tailoring shop") is None
 
-    def test_every_language_has_every_string(self):
-        """A missing translation must never reach a user as a blank."""
+    def test_scripted_languages_are_complete(self):
+        """The guided conversation is written in five languages, and each of
+        those must be whole — a half-translated script is worse than none."""
         from src.i18n import STRINGS
+        scripted = [c for c, meta in LANGUAGES.items() if meta.get("scripted")]
+        assert len(scripted) == 5
         for key, entry in STRINGS.items():
-            for code in LANGUAGES:
+            for code in scripted:
                 assert entry.get(code), f"{key} missing {code}"
+
+    def test_no_language_ever_yields_a_blank(self):
+        """The other eight fall back to English rather than to emptiness.
+
+        This is the honest state of things: the interface speaks thirteen
+        languages, the scripted flow five, and the model-backed assistant
+        answers in whichever the person writes in. What must never happen is a
+        blank line where a question should be."""
+        from src.i18n import STRINGS, t
+        for key in STRINGS:
+            for code in LANGUAGES:
+                assert t(key, code).strip(), f"{key} blank in {code}"
+
+    def test_every_offered_language_matches_a_myscheme_translation(self):
+        """We only offer languages the government itself publishes scheme text
+        in. Translating our buttons into a language whose schemes we could only
+        show in English would be a hollow kind of support."""
+        official = {"en", "hi", "ta", "bn", "mr", "te", "gu", "kn", "ml",
+                    "pa", "or", "as", "ur"}
+        assert set(LANGUAGES) <= official
 
     def test_unknown_key_falls_back_to_itself(self):
         assert t("no_such_key", "hi") == "no_such_key"

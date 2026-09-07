@@ -10,7 +10,7 @@ import {
   type Lang,
 } from "@/lib/i18n/config";
 import { translator } from "@/lib/i18n";
-import type { StringKey } from "@/lib/i18n/dictionary";
+import type { StringKey } from "@/lib/i18n/keys";
 
 export { LANGUAGE_META };
 

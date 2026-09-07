@@ -24,12 +24,28 @@ from typing import Optional
 
 DEFAULT_LANGUAGE = "en"
 
+# The thirteen languages the interface offers, which are the languages
+# myScheme itself publishes scheme text in — verified against their API, not
+# assumed.
+#
+# The scripted conversation below is written in the first five. For the other
+# eight `t()` falls back to English, which is a real gap and is stated rather
+# than hidden: the model-backed assistant answers in whichever of the thirteen
+# a person writes in, so the fallback only affects the no-API-key path.
 LANGUAGES: dict[str, dict[str, str]] = {
-    "en": {"name": "English", "native": "English"},
-    "hi": {"name": "Hindi", "native": "हिन्दी"},
-    "mr": {"name": "Marathi", "native": "मराठी"},
-    "bn": {"name": "Bengali", "native": "বাংলা"},
-    "ta": {"name": "Tamil", "native": "தமிழ்"},
+    "en": {"name": "English", "native": "English", "scripted": True},
+    "hi": {"name": "Hindi", "native": "हिन्दी", "scripted": True},
+    "mr": {"name": "Marathi", "native": "मराठी", "scripted": True},
+    "bn": {"name": "Bengali", "native": "বাংলা", "scripted": True},
+    "ta": {"name": "Tamil", "native": "தமிழ்", "scripted": True},
+    "te": {"name": "Telugu", "native": "తెలుగు", "scripted": False},
+    "gu": {"name": "Gujarati", "native": "ગુજરાતી", "scripted": False},
+    "kn": {"name": "Kannada", "native": "ಕನ್ನಡ", "scripted": False},
+    "ml": {"name": "Malayalam", "native": "മലയാളം", "scripted": False},
+    "pa": {"name": "Punjabi", "native": "ਪੰਜਾਬੀ", "scripted": False},
+    "or": {"name": "Odia", "native": "ଓଡ଼ିଆ", "scripted": False},
+    "as": {"name": "Assamese", "native": "অসমীয়া", "scripted": False},
+    "ur": {"name": "Urdu", "native": "اردو", "scripted": False},
 }
 
 # Unicode blocks -> language. Devanagari is genuinely ambiguous (Hindi/Marathi),
@@ -37,9 +53,28 @@ LANGUAGES: dict[str, dict[str, str]] = {
 # maps cleanly.
 _SCRIPT_RANGES: list[tuple[int, int, str]] = [
     (0x0900, 0x097F, "hi"),   # Devanagari — Hindi or Marathi
-    (0x0980, 0x09FF, "bn"),   # Bengali
+    (0x0980, 0x09FF, "bn"),   # Bengali — also Assamese, see below
+    (0x0A00, 0x0A7F, "pa"),   # Gurmukhi — Punjabi
+    (0x0A80, 0x0AFF, "gu"),   # Gujarati
+    (0x0B00, 0x0B7F, "or"),   # Odia
     (0x0B80, 0x0BFF, "ta"),   # Tamil
+    (0x0C00, 0x0C7F, "te"),   # Telugu
+    (0x0C80, 0x0CFF, "kn"),   # Kannada
+    (0x0D00, 0x0D7F, "ml"),   # Malayalam
+    (0x0600, 0x06FF, "ur"),   # Arabic script — Urdu here
+    (0x0750, 0x077F, "ur"),   # Arabic Supplement
 ]
+
+# Two scripts are shared, and a share cannot be resolved by code point alone.
+#
+# Bengali and Assamese use the same block, differing in two letters; Devanagari
+# carries both Hindi and Marathi. Guessing wrong is cheap — the reader switches
+# in one tap — but guessing at all beats making someone choose a language before
+# they are allowed to ask a question. The more widely read of each pair wins.
+_AMBIGUOUS_SCRIPTS = {"hi": ("hi", "mr"), "bn": ("bn", "as")}
+
+# Assamese-specific letters: ৰ (ra) and ৱ (va), which Bengali does not use.
+_ASSAMESE_MARKERS = "ৰৱ"
 
 
 def detect_language(text: str) -> Optional[str]:
@@ -60,7 +95,12 @@ def detect_language(text: str) -> Optional[str]:
                 break
     if not counts:
         return None
-    return max(counts, key=counts.get)
+    best = max(counts, key=counts.get)
+
+    # Assamese and Bengali share a block; two letters tell them apart.
+    if best == "bn" and any(ch in _ASSAMESE_MARKERS for ch in text):
+        return "as"
+    return best
 
 
 # ---------------------------------------------------------------------------

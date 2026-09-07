@@ -31,7 +31,7 @@ from typing import Any, Optional
 from src.calculator import MoratoriumType, calculate_emi
 from src.discovery import Facets, discover
 from src.config import SCHEMES, get_settings
-from src.i18n import DEFAULT_LANGUAGE, detect_language, t
+from src.i18n import DEFAULT_LANGUAGE, LANGUAGES, detect_language, t
 from src.routing import route_partners, utilisation_note
 from src.schemes import (
     UserProfile,
@@ -481,7 +481,7 @@ async def turn(
         session.track = "welfare"
         session.answers = {}
 
-    if language and language in ("en", "hi", "mr", "bn", "ta"):
+    if language and language in LANGUAGES:
         session.language = language
     elif message and not session.answers:
         # Only on the opening message: after that an English digit shouldn't

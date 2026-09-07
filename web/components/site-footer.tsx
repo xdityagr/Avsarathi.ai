@@ -2,11 +2,11 @@ import Link from "next/link";
 
 import { Logo } from "@/components/logo";
 import { getT } from "@/lib/i18n/server";
-import { DICTIONARY, type StringKey } from "@/lib/i18n/dictionary";
+import { en, type StringKey } from "@/lib/i18n/keys";
 
 /** Official names — myScheme, NSFDC, PFMS — are never translated. */
 function isKey(value: string): value is StringKey {
-  return value in DICTIONARY;
+  return value in en;
 }
 
 const COLUMNS = [

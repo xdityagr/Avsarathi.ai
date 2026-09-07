@@ -11,6 +11,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 
+import { announcePlace } from "@/components/language-suggestion";
 import { OptionRow } from "@/components/option-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -112,6 +113,7 @@ export function CreditForm({ className }: { className?: string }) {
           setPlace(
             [data.district, data.state].filter(Boolean).join(", ") || null,
           );
+          announcePlace(data.state);
         } catch {
           setPlace(null);
         } finally {

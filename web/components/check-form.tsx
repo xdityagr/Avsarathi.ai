@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { ArrowRight, Loader2, LocateFixed, MapPin } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
+import { announcePlace } from "@/components/language-suggestion";
 import { OptionRow } from "@/components/option-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -445,6 +446,7 @@ function LocationPicker({
           const place = await response.json();
           if (place.state) {
             onState(place.state);
+            announcePlace(place.state);
             setStatus(
               place.district ? `${place.district}, ${place.state}` : place.state,
             );
@@ -473,6 +475,7 @@ function LocationPicker({
       const place = await response.json();
       if (place.state) {
         onState(place.state);
+        announcePlace(place.state);
         setStatus(
           place.district ? `${place.district}, ${place.state}` : place.state,
         );
@@ -536,7 +539,11 @@ function LocationPicker({
           id="state"
           className="mt-1.5 h-11 w-full rounded-lg border border-input bg-card px-3 text-base"
           value={state ?? ""}
-          onChange={(event) => onState(event.target.value || undefined)}
+          onChange={(event) => {
+            const next = event.target.value || undefined;
+            onState(next);
+            announcePlace(next);
+          }}
         >
           <option value="">{t("check.location.all")}</option>
           {states.map((name) => (

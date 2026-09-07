@@ -12,7 +12,7 @@ import {
 import { CategoryGrid } from "@/components/category-grid";
 import { ButtonLink } from "@/components/ui/button-link";
 import { getCatalogMeta } from "@/lib/api";
-import { formatNumber } from "@/lib/i18n";
+import { formatNumber, LANGS } from "@/lib/i18n";
 import { getLang } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n";
 
@@ -94,7 +94,7 @@ export default async function HomePage() {
             { value: count, label: t("home.stat.schemes") },
             { value: formatNumber(lang, meta.categories.length || 15), label: t("home.stat.categories") },
             { value: formatNumber(lang, stateCount), label: t("home.stat.states") },
-            { value: formatNumber(lang, 5), label: t("home.stat.languages") },
+            { value: formatNumber(lang, LANGS.length), label: t("home.stat.languages") },
           ].map((stat) => (
             <div key={stat.label} className="bg-card px-4 py-8 text-center">
               <dt className="font-display text-3xl font-bold text-primary sm:text-4xl">
