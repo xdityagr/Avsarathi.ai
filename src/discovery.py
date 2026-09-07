@@ -107,6 +107,16 @@ class DiscoveryResult:
     not_matched: list[DiscoveryMatch] = field(default_factory=list)
     total_considered: int = 0
     corpus_available: bool = True
+    # Counted before the list is trimmed for display. The headline "you match
+    # 1,204 schemes" has to be the real figure, not the size of the first page.
+    total_matched: int = 0
+    total_not_matched: int = 0
+    strength_counts: dict = field(default_factory=dict)
+    # Matches that name a group this person belongs to — their caste, their
+    # occupation, their BPL card. With few answers almost everything "matches",
+    # because a scheme that restricts nothing excludes nobody; this is the count
+    # that actually means something to the person reading it.
+    total_targeted: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -427,6 +437,19 @@ def discover(
             match.strength = MatchStrength.NOT_MATCHED
             result.not_matched.append(match)
 
+    result.total_matched = len(result.matches)
+    result.total_not_matched = len(result.not_matched)
+    result.total_targeted = sum(
+        1 for m in result.matches
+        if any(reason in _TARGETING for reason in m.matched_on)
+    )
+    result.strength_counts = {
+        "LIKELY": sum(1 for m in result.matches
+                      if m.strength is MatchStrength.LIKELY),
+        "CHECK": sum(1 for m in result.matches
+                     if m.strength is MatchStrength.CHECK),
+    }
+
     result.matches.sort(key=lambda m: (-m.relevance, m.name))
     result.matches = result.matches[:limit]
     result.not_matched = result.not_matched[:10]
@@ -466,4 +489,7 @@ def discover_with_credit(
             relevance=1000.0,     # deep, verified schemes always lead
         ))
     result.matches = deep + result.matches
+    result.total_matched += len(deep)
+    result.total_targeted += len(deep)
+    result.strength_counts["ELIGIBLE"] = len(deep)
     return result

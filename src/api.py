@@ -26,6 +26,7 @@ from src.catalog import catalog_meta, get_scheme, search_schemes
 from src.config import SCHEMES, get_settings
 from src.corpus import load_corpus
 from src.discovery import Facets, discover_with_credit
+from src.geo import lookup_pin, reverse_geocode
 from src.literacy import (
     format_fraud_shield,
     format_instalment,
@@ -446,11 +447,14 @@ async def discover_schemes(request: DiscoverRequest) -> dict:
         "matches": [_match_json(m) for m in result.matches],
         "not_matched": [_match_json(m) for m in result.not_matched],
         "total_considered": result.total_considered,
+        "total_matched": result.total_matched,
+        "total_not_matched": result.total_not_matched,
+        "total_targeted": result.total_targeted,
         "corpus_available": result.corpus_available,
         "counts": {
-            "eligible": sum(1 for m in result.matches if m.strength.value == "ELIGIBLE"),
-            "likely": sum(1 for m in result.matches if m.strength.value == "LIKELY"),
-            "check": sum(1 for m in result.matches if m.strength.value == "CHECK"),
+            "eligible": result.strength_counts.get("ELIGIBLE", 0),
+            "likely": result.strength_counts.get("LIKELY", 0),
+            "check": result.strength_counts.get("CHECK", 0),
         },
     }
 
@@ -489,3 +493,26 @@ async def scheme_detail(slug: str, lang: str = "en") -> dict:
     if scheme is None:
         raise HTTPException(status_code=404, detail=f"No scheme with slug '{slug}'")
     return scheme
+
+
+# ---------------------------------------------------------------------------
+# Location
+# ---------------------------------------------------------------------------
+
+@router.get("/geo/reverse")
+async def geo_reverse(lat: float, lon: float) -> dict:
+    """Where is this? Coordinates in, state and district out.
+
+    Routed through us rather than called from the browser so the lookup carries
+    our identifying User-Agent, shares one cache across users, and does not put
+    every visitor's IP in front of a third party.
+    """
+    place = await reverse_geocode(lat, lon)
+    return place.as_dict()
+
+
+@router.get("/geo/pin/{pin}")
+async def geo_pin(pin: str) -> dict:
+    """Six digits people know by heart, for when location is denied or absent."""
+    place = await lookup_pin(pin)
+    return place.as_dict()

@@ -3,6 +3,7 @@ import { Search, SlidersHorizontal } from "lucide-react";
 
 import { SchemeFilters } from "@/components/scheme-filters";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { Input } from "@/components/ui/input";
 import { browseSchemes, getCatalogMeta, type SchemeCard } from "@/lib/api";
 
@@ -187,9 +188,9 @@ function EmptyState() {
         monthly support&rdquo; — or clear a filter. If you tell us about
         yourself instead, we can search on your behalf.
       </p>
-      <Button className="mt-6 h-10 px-5" render={<Link href="/check" />}>
+      <ButtonLink href="/check" className="mt-6 h-10 px-5">
         Check my eligibility
-      </Button>
+      </ButtonLink>
     </div>
   );
 }
@@ -220,9 +221,9 @@ function Pagination({
       aria-label="Pagination"
     >
       {page > 1 ? (
-        <Button variant="outline" className="h-10" render={<Link href={href(page - 1)} />}>
+        <ButtonLink href={href(page - 1)} variant="outline" className="h-10">
           Previous
-        </Button>
+        </ButtonLink>
       ) : (
         <span />
       )}
@@ -230,9 +231,9 @@ function Pagination({
         {page} / {lastPage}
       </span>
       {page < lastPage ? (
-        <Button variant="outline" className="h-10" render={<Link href={href(page + 1)} />}>
+        <ButtonLink href={href(page + 1)} variant="outline" className="h-10">
           Next
-        </Button>
+        </ButtonLink>
       ) : (
         <span />
       )}

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileText } from "lucide-react";
 
 import { Markdown } from "@/components/markdown";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import {
   Accordion,
   AccordionContent,
@@ -137,9 +137,9 @@ export default async function SchemePage({
               Answer a few optional questions and we will check this scheme along
               with every other one you might be entitled to.
             </p>
-            <Button className="mt-4 h-10 w-full" render={<Link href="/check" />}>
+            <ButtonLink href="/check" className="mt-4 h-10 w-full">
               Check my eligibility
-            </Button>
+            </ButtonLink>
           </div>
 
           <Provenance scheme={scheme} />
@@ -209,16 +209,15 @@ function NotYetFetched({ scheme }: { scheme: SchemeDetail }) {
         rules for this one have not been copied across. Rather than guess at
         them, here is the official page — it is the same source we use.
       </p>
-      <Button
+      <ButtonLink
+        href={scheme.source_url}
+        external
         variant="outline"
         className="mt-5 h-10"
-        render={
-          <a href={scheme.source_url} target="_blank" rel="noopener noreferrer" />
-        }
       >
         Read it on myScheme
         <ExternalLink className="size-4" />
-      </Button>
+      </ButtonLink>
     </div>
   );
 }

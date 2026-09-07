@@ -5,8 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
 import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -15,6 +17,7 @@ const NAV = [
   { href: "/credit", label: "Loans" },
   { href: "/partners", label: "Where to apply" },
   { href: "/track", label: "Track application" },
+  { href: "/chat", label: "Ask" },
 ];
 
 export function SiteHeader() {
@@ -50,13 +53,10 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
-          <Button
-            size="sm"
-            className="hidden sm:inline-flex"
-            render={<Link href="/check" />}
-          >
+          <LanguageSwitcher />
+          <ButtonLink href="/check" size="sm" className="hidden sm:inline-flex">
             Find my schemes
-          </Button>
+          </ButtonLink>
           <Button
             variant="ghost"
             size="icon"

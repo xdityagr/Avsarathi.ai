@@ -1,4 +1,3 @@
-import Link from "next/link";
 import {
   ArrowRight,
   BadgeCheck,
@@ -11,7 +10,7 @@ import {
 } from "lucide-react";
 
 import { CategoryGrid } from "@/components/category-grid";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button-link";
 import { getCatalogMeta } from "@/lib/api";
 
 const STEPS = [
@@ -109,22 +108,18 @@ export default async function HomePage() {
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Button
-                  size="lg"
-                  className="h-12 px-6 text-base"
-                  render={<Link href="/check" />}
-                >
+                <ButtonLink href="/check" size="lg" className="h-12 px-6 text-base">
                   Find my schemes
                   <ArrowRight className="size-4" />
-                </Button>
-                <Button
+                </ButtonLink>
+                <ButtonLink
+                  href="/schemes"
                   size="lg"
                   variant="outline"
                   className="h-12 bg-card px-6 text-base"
-                  render={<Link href="/schemes" />}
                 >
                   Browse all schemes
-                </Button>
+                </ButtonLink>
               </div>
 
               <p className="mt-4 text-sm text-muted-foreground">
@@ -195,14 +190,14 @@ export default async function HomePage() {
                 category below is searchable.
               </p>
             </div>
-            <Button
+            <ButtonLink
+              href="/schemes"
               variant="outline"
               className="h-10 bg-paper px-4"
-              render={<Link href="/schemes" />}
             >
               See all {schemeCount.toLocaleString("en-IN")}
               <ArrowRight className="size-4" />
-            </Button>
+            </ButtonLink>
           </div>
           <CategoryGrid categories={meta.categories} className="mt-10" />
         </div>
@@ -244,14 +239,14 @@ export default async function HomePage() {
                 apply.
               </p>
             </div>
-            <Button
+            <ButtonLink
+              href="/check"
               size="lg"
               className="h-12 bg-gold px-8 text-base font-semibold text-gold-ink hover:bg-gold/90"
-              render={<Link href="/check" />}
             >
               Start
               <ArrowRight className="size-4" />
-            </Button>
+            </ButtonLink>
           </div>
         </div>
       </section>
