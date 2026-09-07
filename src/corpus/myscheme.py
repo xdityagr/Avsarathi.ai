@@ -707,47 +707,89 @@ def crawl_details(client: MySchemeClient, conn: sqlite3.Connection,
         report.details_fetched += 1
 
 
+def store_translation(conn: sqlite3.Connection, slug: str, lang: str,
+                      data: Optional[dict]) -> bool:
+    """Write one translated scheme. False when the API returned nothing for it.
+
+    Extracted so the bulk crawl and any gap-filling retry write through exactly
+    the same code — two copies of an upsert is two places for the columns to
+    drift apart.
+    """
+    block = (data or {}).get(lang)
+    if not block:
+        return False
+
+    basic = block.get("basicDetails", {})
+    content = block.get("schemeContent", {})
+    eligibility = block.get("eligibilityCriteria", {})
+    conn.execute(
+        """INSERT INTO scheme_i18n (slug, lang, name, brief, benefits_md,
+                                    eligibility_md, application_md, fetched_at)
+           VALUES (?,?,?,?,?,?,?,?)
+           ON CONFLICT(slug, lang) DO UPDATE SET
+             name=excluded.name, brief=excluded.brief,
+             benefits_md=excluded.benefits_md,
+             eligibility_md=excluded.eligibility_md,
+             fetched_at=excluded.fetched_at""",
+        (
+            slug, lang, basic.get("schemeName"),
+            content.get("briefDescription"),
+            _md(content, "benefits"),
+            _md(eligibility, "eligibilityDescription"),
+            None, _now(),
+        ),
+    )
+    conn.commit()
+    return True
+
+
+def missing_translations(conn: sqlite3.Connection, lang: str) -> list[str]:
+    """Slugs with no row for this language yet."""
+    return [
+        row["slug"]
+        for row in conn.execute(
+            """SELECT s.slug FROM schemes s
+               LEFT JOIN scheme_i18n i ON i.slug = s.slug AND i.lang = ?
+               WHERE i.slug IS NULL ORDER BY s.slug""",
+            (lang,),
+        )
+    ]
+
+
 def crawl_translations(client: MySchemeClient, conn: sqlite3.Connection,
                        report: IngestReport, langs: Iterable[str] = ("hi",),
-                       limit: Optional[int] = None) -> None:
-    """Official government translations — better than machine-translating."""
-    rows = conn.execute("SELECT slug FROM schemes ORDER BY slug").fetchall()
-    slugs = [r["slug"] for r in rows]
-    if limit:
-        slugs = slugs[:limit]
+                       limit: Optional[int] = None,
+                       skip_existing: bool = True,
+                       attempts: int = 2) -> None:
+    """Official government translations — better than machine-translating.
 
+    Resumable by default: a language already stored is not fetched again, so a
+    run interrupted at 78% picks up where it stopped instead of spending an hour
+    re-downloading what it has. Pass `skip_existing=False` to refresh.
+
+    Retries once by default, because the failure this most often hits is an
+    empty response body under rate pressure rather than a missing translation —
+    treating that as "no translation exists" would quietly leave gaps.
+    """
     for lang in langs:
+        slugs = (missing_translations(conn, lang) if skip_existing
+                 else [r["slug"] for r in
+                       conn.execute("SELECT slug FROM schemes ORDER BY slug")])
+        if limit:
+            slugs = slugs[:limit]
+        logger.info("Translations %s: %d to fetch", lang, len(slugs))
+
         for slug in slugs:
-            try:
-                data = client.detail(slug, lang=lang)
-            except Exception as exc:
-                report.note(f"Translation {lang} for {slug} failed: {exc}")
-                continue
-            block = (data or {}).get(lang)
-            if not block:
-                continue
-            basic = block.get("basicDetails", {})
-            content = block.get("schemeContent", {})
-            eligibility = block.get("eligibilityCriteria", {})
-            conn.execute(
-                """INSERT INTO scheme_i18n (slug, lang, name, brief, benefits_md,
-                                            eligibility_md, application_md, fetched_at)
-                   VALUES (?,?,?,?,?,?,?,?)
-                   ON CONFLICT(slug, lang) DO UPDATE SET
-                     name=excluded.name, brief=excluded.brief,
-                     benefits_md=excluded.benefits_md,
-                     eligibility_md=excluded.eligibility_md,
-                     fetched_at=excluded.fetched_at""",
-                (
-                    slug, lang, basic.get("schemeName"),
-                    content.get("briefDescription"),
-                    _md(content, "benefits"),
-                    _md(eligibility, "eligibilityDescription"),
-                    None, _now(),
-                ),
-            )
-            conn.commit()
-            report.translations += 1
+            for attempt in range(attempts):
+                try:
+                    if store_translation(conn, slug, lang, client.detail(slug, lang=lang)):
+                        report.translations += 1
+                    break
+                except Exception as exc:                       # noqa: BLE001
+                    if attempt == attempts - 1:
+                        report.note(f"Translation {lang} for {slug} failed: {exc}")
+                    else:
+                        time.sleep(2)
 
 
 def rebuild_fts(conn: sqlite3.Connection) -> None:
