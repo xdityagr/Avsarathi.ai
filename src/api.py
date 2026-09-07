@@ -16,12 +16,16 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter
+from dataclasses import asdict
+
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from src.calculator import calculate_emi
+from src.catalog import catalog_meta, get_scheme, search_schemes
 from src.config import SCHEMES, get_settings
 from src.corpus import load_corpus
+from src.discovery import Facets, discover_with_credit
 from src.literacy import (
     format_fraud_shield,
     format_instalment,
@@ -337,3 +341,151 @@ async def translations(lang: str) -> dict:
     if lang not in LANGUAGES:
         lang = "en"
     return {"language": lang, "languages": LANGUAGES, "strings": ui_strings(lang)}
+
+
+# ---------------------------------------------------------------------------
+# The national corpus — discovery, browse, detail
+#
+# `/api/schemes` above is the five NSFDC credit products we model completely.
+# Everything below is the ~4,700-scheme welfare corpus: broader, shallower, and
+# deliberately kept on separate routes so the two are never confused.
+# ---------------------------------------------------------------------------
+
+
+class DiscoverRequest(BaseModel):
+    """Every field optional, on purpose.
+
+    A person answers what they are comfortable answering, and each answer only
+    ever *adds* precision. Nothing here is required, because a required field
+    would be a wall in front of someone who came to us for help.
+    """
+    caste: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = Field(default=None, ge=0, le=120)
+    state: Optional[str] = None
+    residence: Optional[str] = None
+    family_income: Optional[float] = Field(default=None, ge=0)
+    is_bpl: Optional[bool] = None
+    disability: Optional[bool] = None
+    minority: Optional[bool] = None
+    is_student: Optional[bool] = None
+    occupation: Optional[str] = None
+    employment_status: Optional[str] = None
+    categories: list[str] = Field(default_factory=list)
+    limit: int = Field(default=40, ge=1, le=200)
+    # Credit needs a project to price, so it is only evaluated when asked for.
+    include_credit: bool = False
+    project_type: Optional[str] = None
+    project_cost: Optional[float] = Field(default=None, ge=0)
+
+
+def _match_json(match) -> dict:
+    return {
+        "scheme_uid": match.scheme_uid,
+        "slug": match.slug,
+        "name": match.name,
+        "strength": match.strength.value,
+        "level": match.level,
+        "state": match.state,
+        "categories": match.categories,
+        "brief": match.brief,
+        "source_url": match.source_url,
+        "depth": match.depth,
+        "matched_on": match.matched_on,
+        "unknown": match.unknown,
+        "unmet": match.unmet,
+        "relevance": match.relevance,
+    }
+
+
+@router.post("/discover")
+async def discover_schemes(request: DiscoverRequest) -> dict:
+    """Every scheme this person plausibly qualifies for, ranked, with reasons.
+
+    The verdict vocabulary is deliberately honest: ELIGIBLE only for the five
+    NSFDC products whose every published rule we evaluate, LIKELY when the
+    structured criteria pass but the scheme's prose may add more, and CHECK when
+    the scheme names a criterion the person has not told us about.
+    """
+    facets = Facets(
+        caste=request.caste,
+        gender=request.gender,
+        age=request.age,
+        state=request.state,
+        residence=request.residence,
+        family_income=request.family_income,
+        is_bpl=request.is_bpl,
+        disability=request.disability,
+        minority=request.minority,
+        is_student=request.is_student,
+        occupation=request.occupation,
+        employment_status=request.employment_status,
+        categories=request.categories,
+    )
+
+    profile = None
+    if (request.include_credit and request.project_type
+            and request.project_cost is not None
+            and request.family_income is not None):
+        try:
+            profile = UserProfile(
+                project_type=request.project_type,
+                project_cost=request.project_cost,
+                annual_income=request.family_income,
+                category=(request.caste or "SC").upper(),
+                gender=request.gender or "male",
+            )
+        except ValueError as exc:
+            # An unusable project type must not cost the person their welfare
+            # results — drop the credit tier and answer the rest.
+            logger.warning("Credit tier skipped: %s", exc)
+
+    result = discover_with_credit(facets, profile=profile, limit=request.limit)
+
+    return {
+        "matches": [_match_json(m) for m in result.matches],
+        "not_matched": [_match_json(m) for m in result.not_matched],
+        "total_considered": result.total_considered,
+        "corpus_available": result.corpus_available,
+        "counts": {
+            "eligible": sum(1 for m in result.matches if m.strength.value == "ELIGIBLE"),
+            "likely": sum(1 for m in result.matches if m.strength.value == "LIKELY"),
+            "check": sum(1 for m in result.matches if m.strength.value == "CHECK"),
+        },
+    }
+
+
+@router.get("/catalog")
+async def browse_catalog(
+    q: str = "",
+    state: Optional[str] = None,
+    category: Optional[str] = None,
+    level: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 24,
+) -> dict:
+    """Browse the whole corpus without answering a single personal question."""
+    result = search_schemes(q=q, state=state, category=category, level=level,
+                            page=page, page_size=min(page_size, 100))
+    return {
+        "items": [asdict(item) for item in result.items],
+        "total": result.total,
+        "page": result.page,
+        "page_size": result.page_size,
+        "corpus_available": result.corpus_available,
+    }
+
+
+@router.get("/catalog/meta")
+async def catalog_filters() -> dict:
+    """The filter vocabulary, read from the corpus so it can never drift."""
+    return catalog_meta()
+
+
+@router.get("/catalog/{slug}")
+async def scheme_detail(slug: str, lang: str = "en") -> dict:
+    """One scheme in full — benefits, eligibility, documents, FAQs, how to apply."""
+    scheme = get_scheme(slug, lang=lang)
+    if scheme is None:
+        raise HTTPException(status_code=404, detail=f"No scheme with slug '{slug}'")
+    return scheme

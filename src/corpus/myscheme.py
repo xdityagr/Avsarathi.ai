@@ -616,8 +616,18 @@ def store_eligibility(conn: sqlite3.Connection, slug: str, parsed: dict) -> None
 
 def crawl_details(client: MySchemeClient, conn: sqlite3.Connection,
                   report: IngestReport, slugs: Optional[list[str]] = None,
-                  limit: Optional[int] = None) -> None:
-    """Full content for each scheme, plus documents and FAQs."""
+                  limit: Optional[int] = None,
+                  fetch_sub_resources: bool = False) -> None:
+    """Full content for each scheme.
+
+    Two requests per scheme by default: lang=en for English prose, lang=hi for
+    the structured eligibility that only the non-English overlay returns.
+
+    Documents and FAQs are opt-in because they double the crawl to four
+    requests per scheme — 4,772 schemes is 5 hours instead of 2.5. They are
+    Plane B content, not needed to decide eligibility, so they can be fetched
+    lazily when a scheme is actually viewed.
+    """
     if slugs is None:
         rows = conn.execute(
             "SELECT slug FROM schemes WHERE details_md IS NULL ORDER BY slug"
@@ -659,7 +669,7 @@ def crawl_details(client: MySchemeClient, conn: sqlite3.Connection,
 
         documents_md = None
         faqs_json = None
-        if scheme_id:
+        if scheme_id and fetch_sub_resources:
             try:
                 docs = client.sub_resource(scheme_id, "documents")
                 documents_md = _md((docs or {}).get("en", {}), "documentsRequired")
