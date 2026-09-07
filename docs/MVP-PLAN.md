@@ -88,7 +88,7 @@ Sizes were relative (S ≈ half a day, M ≈ 1–2 days, L ≈ 3+). **11 of 14 d
 | 8 | Map | **Done** | `src/maps.py` — OSM tiles, local cache, offline after one run |
 | 9 | Cheapest Scheme + Route | **Done** | Scheme comparison live; partner-rate route stays silent unless a spread is published |
 | 10 | Script detection + Hindi | **Exceeded** | 5 languages, not 2 — `src/i18n.py` |
-| 11 | Voice in/out | **Not built** | Deliberately deferred |
+| 11 | Voice in/out | **Not built** | Deferred by decision. Spec still stands: `ai4bharat/indic-conformer-600m-multilingual` for speech-to-text (all 22 languages, MIT) and `ai4bharat/indic-parler-tts` for speech back. Both self-hostable, no vendor |
 | 12 | Partner console | **Regressed** | Existed as a tab; the chat rebuild dropped it — see §2.2 |
 | 13 | Aadhaar offline XML verify | **Done** | `src/verification.py`, real XMLDSig |
 | 14 | Demo ops + cache warming | **Partial** | Tile cache works; no warm-up script yet |
@@ -176,7 +176,7 @@ Mapped to layer boundaries so the interfaces are already defined and people don'
 | 5 | **Console** | Partner web surface | 12 |
 | 6 | **Verification & demo ops** | Aadhaar verify, cache warming, rehearsal, pitch | 13, 14 |
 
-Lanes 1 and 2 are the critical path — nothing demos without the corpus and the rules. **Lane 3's voice work is the single biggest technical risk; it starts on day one, not when the rest is done.**
+Lanes 1 and 2 were the critical path and are done. **Lane 3's voice work was flagged as the biggest technical risk and was deferred rather than started — that call still stands.** Voice only begins once the UI has been reviewed and the partner console is back (§4).
 
 The national rule is 6 members with at least 1 female member. Lane 6 doubles as the pitch owner, and per `rules.md` every member must be able to field a question on any component — rehearse cross-lane, not just your own.
 
@@ -209,14 +209,14 @@ left; that time is worth more spent breaking the demo deliberately.
 
 ## 5. Demo ops — the part teams skip and lose on
 
-**Pre-warm every cache on the demo path.** No live LLM call should sit on the critical path. Run the exact demo profile beforehand so every explanation, translation and TTS clip is cached. A cache-warm demo is deterministic; a cold one is a coin flip on somebody's rate limit.
+**Pre-warm every cache on the demo path.** No live LLM call should sit on the critical path. Run the exact demo profile beforehand in every language you will show, so every explanation and every map tile is already cached. A cache-warm demo is deterministic; a cold one is a coin flip on somebody's rate limit.
 
 **Three fallback layers, rehearsed in order:**
 1. Live WhatsApp on real infrastructure — the goal
 2. Local instance on the laptop, phone on hotspot — if venue wifi fails
 3. Screen recording of the full flow — if everything fails. *Record it in week 3, not the night before*
 
-**Deliberately break it in rehearsal.** Income of exactly ₹5,00,000 (the boundary a judge will test). A profile that matches nothing → No Dead Ends must fire. Two messages sent back to back. A voice note with background noise. An out-of-category user. If any produces a dead end or a silence, that's a bug, not an edge case.
+**Deliberately break it in rehearsal.** Income of exactly ₹5,00,000 (the boundary a judge will test). A profile that matches nothing → No Dead Ends must fire. Two messages sent back to back. A half-typed answer, and an answer in the wrong script. An out-of-category user. If any produces a dead end or a silence, that's a bug, not an edge case.
 
 **Own the mock disclosure — don't get caught by it.** Branch-level utilisation and RRB NPA figures are still mocked (`data-sources.md` §5.1). Say it before a judge asks, in the same breath as reveal 2: *"state-level utilisation is real and published; branch-level isn't published by anyone, so that's representative data, and here's the rule it feeds."* Volunteered, it's rigour. Extracted under questioning, it's a gap.
 
@@ -258,4 +258,6 @@ The model writes the greeting, nothing else.
 
 ## 7. The one-sentence version
 
-> Every other platform tells you which scheme you *might* qualify for. Avsarathi proves you qualify, tells you what the loan actually costs against the moneylender you'd otherwise use, and routes you to a partner that can actually disburse this month — in your language, by voice if you can't read.
+> Every other platform tells you which scheme you *might* qualify for. Avsarathi proves you qualify, tells you what the loan actually costs against the moneylender you'd otherwise use, and routes you to a partner that can actually disburse this month — in your own language, in your own script.
+
+*(The earlier version of this line ended "by voice if you can't read". Voice is not built. Do not say it.)*
