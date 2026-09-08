@@ -32,7 +32,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.paths import CORPUS_DB   # noqa: E402
+from src.paths import CATALOGUE_DB as CORPUS_DB   # noqa: E402
 
 ASSET = "schemes.db.gz"
 

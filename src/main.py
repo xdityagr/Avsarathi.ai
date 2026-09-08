@@ -125,12 +125,12 @@ async def health_check():
 
     where = paths.describe()
     return {
-        "status": "ok" if where["corpus_present"] == "True" else "degraded",
+        "status": "ok" if where["catalogue_present"] == "True" else "degraded",
         "service": "avsarathi",
-        "corpus": {
-            "found": where["corpus_present"] == "True",
-            "size_mb": where["corpus_mb"],
-            "dir": where["corpus_dir"],
+        "catalogue": {
+            "found": where["catalogue_present"] == "True",
+            "size_mb": where["catalogue_mb"],
+            "dir": where["catalogue_dir"],
         },
         "state_dir": where["state_dir"],
     }

@@ -47,7 +47,7 @@ from src.schemes import UserProfile, evaluate_eligibility
 
 logger = logging.getLogger(__name__)
 
-from src.paths import CORPUS_DB as CORPUS_PATH
+from src.paths import CATALOGUE_DB as CORPUS_PATH
 
 MYSCHEME_URL = "https://www.myscheme.gov.in/schemes/{slug}"
 

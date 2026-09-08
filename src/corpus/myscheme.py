@@ -115,7 +115,7 @@ FACET_DEFAULTS = {
     "maritalStatus": "All",
 }
 
-from src.paths import CORPUS_DB as DB_PATH
+from src.paths import CATALOGUE_DB as DB_PATH
 
 SCHEMA = [
     """

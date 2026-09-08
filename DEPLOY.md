@@ -8,7 +8,7 @@ image. Roughly forty minutes end to end, most of it waiting for a Docker build.
                  │  rewrite /api/* and /media/*   ← server-side, so the browser
                  ▼                                  only ever sees one origin
               Render (FastAPI)
-                 ├── /corpus/schemes.db   283 MB, read-only, baked into the image
+                 ├── /catalogue/schemes.db  285 MB, read-only, baked into the image
                  └── /data                tiny, written to, must survive a deploy
 ```
 
@@ -66,10 +66,10 @@ whether it found it — a disk mounted somewhere other than where the app looks
 is the commonest way this fails, and it is invisible until something reads.
 
 ```json
-{ "status": "ok", "corpus": { "found": true, "size_mb": "283" } }
+{ "status": "ok", "catalogue": { "found": true, "size_mb": "285" } }
 ```
 
-`"status": "degraded"` means the corpus is missing. Check the `CORPUS_TAG`.
+`"status": "degraded"` means the catalogue is missing. Check the `CORPUS_TAG`.
 
 ### Two things about the free plan that will bite
 
@@ -84,6 +84,14 @@ both free — hitting `https://your-service.onrender.com/health`.
 **The filesystem is ephemeral.** See below.
 
 ---
+
+### A name that is already taken
+
+`AVSARATHI_CORPUS_DIR` belongs to `src/corpus/loader.py` and points at the
+hand-curated NSFDC file, `corpus/v1/schemes.json` — source, shipped with the
+code. The myScheme catalogue uses `AVSARATHI_CATALOGUE_DIR`. Two different
+things in this repository are called "the corpus"; setting the wrong one killed
+the container on import, before it served a single request.
 
 ## 3. The database
 

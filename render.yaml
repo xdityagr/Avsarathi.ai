@@ -24,9 +24,10 @@ services:
 
     envVars:
       # ---- where things live -------------------------------------------
-      # The corpus is baked into the image at /corpus and never written to.
-      - key: AVSARATHI_CORPUS_DIR
-        value: /corpus
+      # The catalogue is baked into the image at /catalogue, never written to.
+      # (AVSARATHI_CORPUS_DIR is a different setting — leave it unset.)
+      - key: AVSARATHI_CATALOGUE_DIR
+        value: /catalogue
       # State — opt-outs, message idempotency, the geocoding cache. On the free
       # plan this is the container's own filesystem and does NOT survive a
       # deploy or a spin-down. Attach the disk below to fix that.

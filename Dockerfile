@@ -32,22 +32,28 @@ RUN pip install --no-cache-dir -r requirements.txt
 ARG CORPUS_TAG=corpus-latest
 ARG CORPUS_REPO=xdityagr/Avsarathi.ai
 
-RUN mkdir -p /corpus \
- && echo "Fetching corpus ${CORPUS_TAG} from ${CORPUS_REPO}…" \
+RUN mkdir -p /catalogue \
+ && echo "Fetching catalogue ${CORPUS_TAG} from ${CORPUS_REPO}…" \
  && curl -fSL --retry 3 --retry-delay 5 \
       "https://github.com/${CORPUS_REPO}/releases/download/${CORPUS_TAG}/schemes.db.gz" \
       -o /tmp/schemes.db.gz \
- && gunzip -c /tmp/schemes.db.gz > /corpus/schemes.db \
+ && gunzip -c /tmp/schemes.db.gz > /catalogue/schemes.db \
  && rm /tmp/schemes.db.gz \
- && ls -lh /corpus/schemes.db
+ && ls -lh /catalogue/schemes.db
 
 COPY src ./src
 COPY corpus ./corpus
 COPY scripts ./scripts
 
-# Read-only corpus in the image; writable state on a mounted disk. Keeping them
-# apart is what stops a deploy replacing the file someone's opt-out lives in.
-ENV AVSARATHI_CORPUS_DIR=/corpus \
+# Read-only catalogue in the image; writable state on a mounted disk. Keeping
+# them apart is what stops a deploy replacing the file someone's opt-out lives
+# in.
+#
+# Deliberately NOT AVSARATHI_CORPUS_DIR. That name already belongs to the
+# hand-curated NSFDC file at /app/corpus/v1/schemes.json — source, shipped with
+# the code, a different thing entirely. Setting it here pointed that loader at
+# /corpus and the container died on import before serving a single request.
+ENV AVSARATHI_CATALOGUE_DIR=/catalogue \
     AVSARATHI_STATE_DIR=/data
 
 RUN mkdir -p /data
