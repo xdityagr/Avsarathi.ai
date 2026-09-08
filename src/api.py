@@ -19,10 +19,11 @@ from typing import Optional
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src import speech
 from src.agent import (
     is_available as agent_is_available,
     respond as agent_respond,
@@ -474,10 +475,16 @@ async def browse_catalog(
     level: Optional[str] = None,
     page: int = 1,
     page_size: int = 24,
+    lang: str = "en",
 ) -> dict:
-    """Browse the whole corpus without answering a single personal question."""
+    """Browse the whole corpus without answering a single personal question.
+
+    `lang` serves myScheme's own translations rather than machine ones — see
+    `catalog.search_schemes`. The detail route has taken a `lang` all along;
+    this one had not, so switching to Hindi translated one page out of two.
+    """
     result = search_schemes(q=q, state=state, category=category, level=level,
-                            page=page, page_size=min(page_size, 100))
+                            page=page, page_size=min(page_size, 100), lang=lang)
     return {
         "items": [asdict(item) for item in result.items],
         "total": result.total,
@@ -640,3 +647,58 @@ async def ask_agent_streaming(request: AgentRequest):
         # and undo the entire point of streaming.
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Speech
+# ---------------------------------------------------------------------------
+
+# A voice message is short. This is a guard against a runaway upload, not a
+# limit anyone speaking a sentence will ever meet.
+MAX_AUDIO_BYTES = 8 * 1024 * 1024
+
+
+@router.post("/transcribe")
+async def transcribe_audio(
+    audio: UploadFile = File(...),
+    language: str = Form(""),
+) -> dict:
+    """A recorded voice message, as words.
+
+    The website used the browser's own Web Speech API before this, which is why
+    it worked on some machines and silently did nothing on others — it needs
+    Chrome, it needs a network round-trip to Google, and it is absent entirely
+    on Firefox and in most Android WebViews. WhatsApp voice notes already went
+    through Sarvam; this puts the website on the same engine, so a Tamil
+    speaker gets the same transcript on both.
+
+    `language` is a hint, not an instruction. Empty means "work it out", which
+    is genuinely better than being told: Sarvam detects correctly and someone
+    browsing in English may still speak Marathi.
+    """
+    if not speech.is_available():
+        raise HTTPException(status_code=503,
+                            detail="Speech transcription is not configured")
+
+    raw = await audio.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Empty recording")
+    if len(raw) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Recording too long")
+
+    result = await speech.transcribe(
+        raw,
+        content_type=audio.content_type or "audio/webm",
+        language=language or None,
+    )
+
+    return {
+        "text": result.text,
+        # What it heard the language as. The interface uses this to offer a
+        # switch rather than to perform one — silently changing someone's
+        # language because of one sentence is worse than leaving it alone.
+        "language": result.language,
+        "ok": result.ok,
+        "unclear": result.unclear,
+        "provider": result.provider,
+    }
