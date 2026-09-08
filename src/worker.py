@@ -26,7 +26,9 @@ from src.config import get_settings
 from src.graph import build_graph
 from src import meta_whatsapp as meta
 from src import speech
-from src.whatsapp_brain import known_language, reply as brain_reply
+from src.whatsapp_brain import (
+    language_if_known, remember_detected_language, reply as brain_reply,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,20 @@ class RateLimiter:
 
         self._buckets[user_id].append(now)
         return True
+
+
+# How much of a transcript to echo back. Long enough to catch a misheard
+# number or place, short enough that it stays a footnote to the answer rather
+# than competing with it.
+ECHO_CHARS = 90
+
+
+def _echo(heard: str) -> str:
+    """The one line that says what we thought the voice note said."""
+    text = " ".join(heard.split())
+    if len(text) > ECHO_CHARS:
+        text = text[:ECHO_CHARS].rstrip() + "…"
+    return f'🎤 _"{text}"_'
 
 
 # ---------------------------------------------------------------------------
@@ -177,9 +193,9 @@ class MessageWorker:
 
     @staticmethod
     async def _transcribe_voice_note(user_id: str, msg: dict) -> str:
-        """A voice note, in the language this person has been writing in."""
+        """A voice note, in whatever language it turns out to be in."""
         if not speech.is_available():
-            logger.info("Voice note from %s but no Deepgram key", user_id[:10] + "…")
+            logger.info("Voice note from %s but no speech key", user_id[:10] + "…")
             return ""
         try:
             audio, content_type = await meta.fetch_media(msg["media_id"])
@@ -187,16 +203,24 @@ class MessageWorker:
             logger.warning("Could not fetch voice note: %s", exc)
             return ""
 
+        # `language_if_known`, not `known_language`: the latter answers "en"
+        # for a stranger, which would tell the transcriber to expect English
+        # from someone speaking Tamil. None lets it detect instead.
         result = await speech.transcribe(
             audio,
             content_type=msg.get("media_type") or content_type,
-            language=known_language(user_id),
+            language=language_if_known(user_id),
         )
         if not result.ok:
             return ""
+
+        # A spoken language is as good a signal as a typed script, and for
+        # someone who cannot type their own script it is the only one.
+        remember_detected_language(user_id, result.language)
+
         if result.unclear:
-            logger.info("Low-confidence transcript (%.2f) from %s",
-                        result.confidence, user_id[:10] + "…")
+            logger.info("Low-confidence transcript (%.2f, %s) from %s",
+                        result.confidence, result.provider, user_id[:10] + "…")
         return result.text
 
     async def _process_message(self, msg: dict, worker_id: int) -> None:
@@ -224,8 +248,10 @@ class MessageWorker:
         # A voice note has no body. Transcribe it first, then it is just a
         # message like any other — which is the point: the brain should never
         # need to know how the words arrived.
+        heard = ""
         if not body and msg.get("media_id"):
             body = await self._transcribe_voice_note(user_id, msg)
+            heard = body
             if not body:
                 await meta.send_text(
                     to=user_id,
@@ -247,6 +273,16 @@ class MessageWorker:
                 "Something went wrong at our end. Please send your message "
                 "again in a moment — nothing you told me is lost."
             )
+
+        # Show what we heard, once, above the answer.
+        #
+        # Transcription is never perfect, and the failure it produces is quiet:
+        # a misheard "five lakh" becomes "five thousand" and the answer that
+        # follows is confidently about the wrong thing. Echoing one line lets
+        # the person catch it themselves in a second — and when it is right, it
+        # is the only proof they get that the voice note arrived at all.
+        if heard and response_text:
+            response_text = f"{_echo(heard)}\n\n{response_text}"
 
         success = False
         if response_text:
