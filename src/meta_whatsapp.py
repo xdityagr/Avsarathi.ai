@@ -39,7 +39,7 @@ TIMEOUT = httpx.Timeout(20.0, connect=10.0)
 
 def is_configured() -> bool:
     settings = get_settings()
-    return bool(settings.whatsapp_access_token and settings.whatsapp_phone_number_id)
+    return bool(settings.whatsapp_token and settings.whatsapp_phone_number_id)
 
 
 def _base() -> str:
@@ -173,7 +173,7 @@ async def send_text(to: str, body: str) -> bool:
             response = await client.post(
                 url,
                 json=payload,
-                headers={"Authorization": f"Bearer {settings.whatsapp_access_token}"},
+                headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
             )
     except Exception as exc:                                  # noqa: BLE001
         logger.warning("Send failed to %s: %s", to[:8] + "…", exc)
@@ -196,7 +196,7 @@ async def fetch_media(media_id: str) -> tuple[bytes, str]:
     expires quickly, which is why it is fetched immediately rather than stored.
     """
     settings = get_settings()
-    headers = {"Authorization": f"Bearer {settings.whatsapp_access_token}"}
+    headers = {"Authorization": f"Bearer {settings.whatsapp_token}"}
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
         lookup = await client.get(f"{_base()}/{media_id}", headers=headers)
@@ -229,7 +229,7 @@ async def mark_read(message_id: str) -> None:
                     "status": "read",
                     "message_id": message_id,
                 },
-                headers={"Authorization": f"Bearer {settings.whatsapp_access_token}"},
+                headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
             )
     except Exception as exc:                                  # noqa: BLE001
         logger.debug("Could not mark %s read: %s", message_id[:12], exc)

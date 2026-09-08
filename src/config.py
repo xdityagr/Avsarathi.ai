@@ -41,7 +41,11 @@ class Settings(BaseSettings):
     )
     whatsapp_access_token: str = Field(
         default="",
-        description="Meta access token — a permanent System User token in production",
+        description="Meta access token — the dashboard's temporary one expires in 24h",
+    )
+    whatsapp_sat: str = Field(
+        default="",
+        description="System User Access Token — never expires; preferred over the above",
     )
     whatsapp_phone_number_id: str = Field(
         default="",
@@ -59,6 +63,18 @@ class Settings(BaseSettings):
         default="v21.0",
         description="Graph API version",
     )
+
+    @property
+    def whatsapp_token(self) -> str:
+        """The token to send with, preferring the one that does not expire.
+
+        The token the dashboard shows on the API Setup page lasts 24 hours. It
+        is the obvious one to copy and the reason a WhatsApp integration works
+        on the day it is built and returns 401 the next morning — which, on a
+        demo day, is indistinguishable from the whole thing being broken. A
+        System User Access Token has no expiry, so it wins whenever it is set.
+        """
+        return self.whatsapp_sat or self.whatsapp_access_token
 
     webhook_base_url: str = Field(
         default="http://localhost:8000",
@@ -122,9 +138,14 @@ class Settings(BaseSettings):
         description="Model for generation on cache miss"
     )
 
+    sarvam_api_key: str = Field(
+        default="",
+        description="Sarvam AI — primary speech-to-text, built for Indian languages",
+    )
     deepgram_api_key: str = Field(
         default="",
-        description="Deepgram, for speech-to-text on WhatsApp voice notes",
+        description="Deepgram — fallback speech-to-text, and the only one that "
+                    "handles Assamese and Urdu",
     )
 
     # --- Financial literacy (PS impact goal: "enhance financial literacy") ---
