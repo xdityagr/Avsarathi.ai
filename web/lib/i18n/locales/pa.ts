@@ -335,4 +335,5 @@ export const pa: Strings = {
   "profile.filled": "{total} ਵਿੱਚੋਂ {n} ਭਰੇ",
   "profile.scan": "ਆਧਾਰ ਤੋਂ ਭਰੋ",
   "profile.privacy": "ਸਿਰਫ਼ ਇਸੇ ਫ਼ੋਨ ਵਿੱਚ ਰਹਿੰਦਾ ਹੈ। ਅਸੀਂ ਇਹ ਨਹੀਂ ਰੱਖਦੇ, ਅਤੇ ਇੱਥੇ ਮਿਟਾਉਣ ਨਾਲ ਇਹ ਹਟ ਜਾਂਦਾ ਹੈ।",
+  "nav.me": "ਤੁਹਾਡੇ ਬਾਰੇ",
 };

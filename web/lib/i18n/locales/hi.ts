@@ -332,4 +332,5 @@ export const hi: Strings = {
   "profile.filled": "{total} में से {n} भरे",
   "profile.scan": "आधार से भरिए",
   "profile.privacy": "सिर्फ़ इसी फ़ोन में रहता है। हम इसे नहीं रखते, और यहाँ मिटाने पर यह हट जाता है।",
+  "nav.me": "आपके बारे में",
 };

@@ -53,6 +53,9 @@ TOKEN_BYTES = 16
 MEDIA_FILENAME_PATTERN = r"^[A-Za-z0-9_-]{22}\.png$"
 
 PIN_COLOURS = [(198, 40, 40), (21, 101, 192), (46, 125, 50), (239, 108, 0)]
+# The reader's own position, in the product's ink rather than the pin cycle,
+# so it never reads as just another office.
+REFERENCE_COLOUR = (28, 26, 23)
 
 
 @dataclass
@@ -139,6 +142,49 @@ async def _fetch_tile(
 # Rendering
 # ---------------------------------------------------------------------------
 
+def _pin_font():
+    """A real font if one is available, Pillow's bitmap default otherwise.
+
+    Nothing here fails if the lookup misses — a slightly small label is a much
+    smaller problem than a map that did not render.
+    """
+    from PIL import ImageFont
+
+    for candidate in ("DejaVuSans-Bold.ttf", "arialbd.ttf", "Arial Bold.ttf"):
+        try:
+            return ImageFont.truetype(candidate, 15)
+        except Exception:
+            continue
+    try:
+        return ImageFont.load_default()
+    except Exception:
+        return None
+
+
+def _draw_attribution(draw, width: int, height: int) -> None:
+    """Burn the OpenStreetMap credit into the image itself.
+
+    Required by the tiles' licence, and it has to be in the pixels rather than
+    beside them: this PNG is sent to WhatsApp on its own, where there is no
+    caption to carry it.
+    """
+    from PIL import ImageFont
+
+    notice = "\u00a9 OpenStreetMap contributors"
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 11)
+    except Exception:
+        font = ImageFont.load_default()
+
+    left, top, right, bottom = draw.textbbox((0, 0), notice, font=font)
+    text_w, text_h = right - left, bottom - top
+    pad = 4
+    box = [width - text_w - pad * 2, height - text_h - pad * 2, width, height]
+    draw.rectangle(box, fill=(255, 255, 255))
+    draw.text((box[0] + pad - left, box[1] + pad - top), notice,
+              fill=(90, 90, 90), font=font)
+
+
 async def render_map(
     pins: list[MapPin],
     output_dir: Path,
@@ -157,9 +203,18 @@ async def render_map(
         raise ValueError("render_map needs at least one pin")
 
     zoom = choose_zoom(pins, width, height)
-    centre_lat = sum(p.latitude for p in pins) / len(pins)
-    centre_lon = sum(p.longitude for p in pins) / len(pins)
-    centre_x, centre_y = deg2num(centre_lat, centre_lon, zoom)
+
+    # Centre on the middle of the bounding box, not on the average position.
+    #
+    # choose_zoom guarantees the *span* of the pins fits the canvas, but the
+    # mean of four clustered offices plus one distant office sits inside the
+    # cluster — so the frame was being centred there and the far pin fell off
+    # the edge of an image that had been sized to include it. Four of five
+    # pins reaching the reader is worse than a wider map: it silently drops
+    # the office someone might actually need.
+    tile_xs, tile_ys = zip(*(deg2num(p.latitude, p.longitude, zoom) for p in pins))
+    centre_x = (min(tile_xs) + max(tile_xs)) / 2
+    centre_y = (min(tile_ys) + max(tile_ys)) / 2
 
     # Pixel coordinate of the image's top-left corner in the global tile plane.
     origin_px = centre_x * TILE_SIZE - width / 2
@@ -194,16 +249,40 @@ async def render_map(
         logger.warning("No tiles rendered — falling back to pins on a plain background")
 
     draw = ImageDraw.Draw(canvas)
-    for index, pin in enumerate(pins):
+
+    # "You" goes on top of everything else. It was being drawn first, so an
+    # office a few hundred metres away covered it completely — leaving a map
+    # whose whole point is "here is where you are relative to these" with no
+    # visible "here".
+    def is_reference(pin: MapPin) -> bool:
+        return (pin.label or "").strip().lower() == "you"
+
+    order = sorted(range(len(pins)), key=lambda i: (1 if is_reference(pins[i]) else 0, i))
+
+    font = _pin_font()
+    for index in order:
+        pin = pins[index]
         px, py = deg2num(pin.latitude, pin.longitude, zoom)
         x = px * TILE_SIZE - origin_px
         y = py * TILE_SIZE - origin_py
-        colour = PIN_COLOURS[index % len(PIN_COLOURS)]
-        radius = 13
+        reference = is_reference(pin)
+        colour = REFERENCE_COLOUR if reference else PIN_COLOURS[index % len(PIN_COLOURS)]
+        radius = 15 if reference else 13
         draw.ellipse([x - radius, y - radius, x + radius, y + radius],
                      fill=colour, outline=(255, 255, 255), width=3)
-        marker = pin.label or str(index + 1)
-        draw.text((x - 4 * len(marker[:2]), y - 6), marker[:2], fill=(255, 255, 255))
+
+        marker = (pin.label or str(index + 1))[:3]
+        # Measure and centre rather than guessing from character count: the old
+        # arithmetic left two-digit labels visibly off their own pin.
+        left, top, right, bottom = draw.textbbox((0, 0), marker, font=font)
+        draw.text(
+            (x - (right - left) / 2 - left, y - (bottom - top) / 2 - top),
+            marker,
+            fill=(255, 255, 255),
+            font=font,
+        )
+
+    _draw_attribution(draw, width, height)
 
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / f"{secrets.token_urlsafe(TOKEN_BYTES)}.png"

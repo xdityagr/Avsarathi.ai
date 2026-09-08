@@ -332,4 +332,5 @@ export const en = {
   "profile.filled": "{n} of {total} answered",
   "profile.scan": "Fill from Aadhaar",
   "profile.privacy": "Kept on this phone only. We do not store it, and clearing it here removes it.",
+  "nav.me": "About you",
 } as const;

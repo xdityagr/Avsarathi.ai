@@ -332,4 +332,5 @@ export const mr: Strings = {
   "profile.filled": "{total} पैकी {n} भरले",
   "profile.scan": "आधारवरून भरा",
   "profile.privacy": "फक्त याच फोनमध्ये राहते. आम्ही ते ठेवत नाही, आणि इथे पुसल्यावर ते निघून जाते.",
+  "nav.me": "तुमच्याबद्दल",
 };

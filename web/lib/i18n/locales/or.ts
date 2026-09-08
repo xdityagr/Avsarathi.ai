@@ -332,4 +332,5 @@ export const or: Strings = {
   "profile.filled": "{total} ମଧ୍ୟରୁ {n} ପୂରଣ",
   "profile.scan": "ଆଧାରରୁ ପୂରଣ କରନ୍ତୁ",
   "profile.privacy": "କେବଳ ଏହି ଫୋନରେ ରହେ। ଆମେ ଏହା ରଖୁ ନାହିଁ, ଏଠାରେ ଲିଭାଇଲେ ଏହା ଚାଲିଯାଏ।",
+  "nav.me": "ଆପଣଙ୍କ ବିଷୟରେ",
 };

@@ -332,4 +332,5 @@ export const bn: Strings = {
   "profile.filled": "{total}-র মধ্যে {n}টি ভরা",
   "profile.scan": "আধার থেকে ভরুন",
   "profile.privacy": "শুধু এই ফোনেই থাকে। আমরা এটি রাখি না, আর এখানে মুছলে এটি চলে যায়।",
+  "nav.me": "আপনার সম্পর্কে",
 };

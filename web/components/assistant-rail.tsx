@@ -1,13 +1,17 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { BadgeCheck, Calculator, Languages, MapPin, Search } from "lucide-react";
+import { BadgeCheck, Calculator, Languages, MapPin, Search, UserRound } from "lucide-react";
+
+import Link from "next/link";
 
 import { LANGUAGE_META, useLanguage } from "@/components/language-provider";
+import { useProfile } from "@/components/profile-sheet";
 import { askForLocation } from "@/components/location-gate";
 import { Orb } from "@/components/orb";
 import { WhatsAppQrPanel } from "@/components/whatsapp-door";
 import { readPlaceCookie } from "@/lib/i18n/config";
+import { PROFILE_FIELDS, profileFilled } from "@/lib/profile";
 
 const CAN = [
   { icon: Search, key: "chat.can.find" },
@@ -37,6 +41,7 @@ const CAN = [
  */
 export function AssistantRail({ state }: { state: string | null }) {
   const { lang, t } = useLanguage();
+  const filled = profileFilled(useProfile());
   // The cookie is the live value; the server prop is only the first paint.
   const known =
     useSyncExternalStore(() => () => {}, readPlaceCookie, () => state) ?? state;
@@ -81,6 +86,22 @@ export function AssistantRail({ state }: { state: string | null }) {
           <li className="flex items-center gap-2">
             <Languages className="size-4 shrink-0 text-faint" />
             <span>{LANGUAGE_META[lang].native}</span>
+          </li>
+          {/*
+            The sheet IS "what I already know about you", so it belongs in this
+            list rather than buried in a menu — and the count is the honest
+            answer to the question this block is asking.
+          */}
+          <li className="flex items-center gap-2">
+            <UserRound className="size-4 shrink-0 text-faint" />
+            <Link
+              href="/me"
+              className="underline-offset-4 hover:text-leaf hover:underline"
+            >
+              {filled
+                ? t("profile.filled", { n: filled, total: PROFILE_FIELDS.length })
+                : t("profile.scan")}
+            </Link>
           </li>
         </ul>
         {known ? null : (

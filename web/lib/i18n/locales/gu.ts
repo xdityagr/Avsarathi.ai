@@ -332,4 +332,5 @@ export const gu: Strings = {
   "profile.filled": "{total} માંથી {n} ભરાયા",
   "profile.scan": "આધારથી ભરો",
   "profile.privacy": "ફક્ત આ ફોનમાં રહે છે. અમે તે રાખતા નથી, અને અહીં ભૂંસવાથી તે નીકળી જાય છે.",
+  "nav.me": "તમારા વિશે",
 };

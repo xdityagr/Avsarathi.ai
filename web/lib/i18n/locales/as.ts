@@ -332,4 +332,5 @@ export const as: Strings = {
   "profile.filled": "{total} ৰ ভিতৰত {n} পূৰণ",
   "profile.scan": "আধাৰৰ পৰা পূৰণ কৰক",
   "profile.privacy": "কেৱল এই ফোনতেই থাকে। আমি ইয়াক নাৰাখোঁ, আৰু ইয়াত মচিলে এইটো গুচি যায়।",
+  "nav.me": "আপোনাৰ বিষয়ে",
 };

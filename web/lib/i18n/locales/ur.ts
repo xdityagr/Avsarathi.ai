@@ -336,4 +336,5 @@ export const ur: Strings = {
   "profile.filled": "{total} میں سے {n} بھرے",
   "profile.scan": "آدھار سے بھریں",
   "profile.privacy": "صرف اسی فون میں رہتا ہے۔ ہم اسے نہیں رکھتے، اور یہاں مٹانے پر یہ ہٹ جاتا ہے۔",
+  "nav.me": "آپ کے بارے میں",
 };

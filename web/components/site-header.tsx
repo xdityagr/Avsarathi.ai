@@ -18,6 +18,10 @@ const NAV = [
   { href: "/credit", key: "nav.credit" },
   { href: "/partners", key: "nav.partners" },
   { href: "/track", key: "nav.track" },
+  // Answered once and reused everywhere — the assistant, the eligibility
+  // check and every application form read from it, so it needs to be
+  // reachable rather than something you find by accident.
+  { href: "/me", key: "nav.me" },
   { href: "/chat", key: "nav.chat" },
 ] as const;
 
