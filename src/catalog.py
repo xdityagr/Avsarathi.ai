@@ -102,6 +102,7 @@ def search_schemes(
     level: Optional[str] = None,
     page: int = 1,
     page_size: int = PAGE_SIZE,
+    lang: str = "en",
     corpus_path: Path = CORPUS_PATH,
 ) -> SchemePage:
     """Paged browse with optional full-text search and filters.
@@ -109,6 +110,16 @@ def search_schemes(
     State filtering is inclusive of central schemes — the same "All" rule
     discovery uses. A person in Bihar browsing "Bihar" must still see the
     national schemes they can apply for, or the list lies by omission.
+
+    `lang` swaps in myScheme's OWN translations, which we already hold — about
+    4,730 schemes in each of nine languages. Nothing is machine-translated
+    here: these are the strings the government publishes, so a scheme name is
+    the one a person will see on the official site and hear at a counter.
+
+    Switching the interface to Hindi and leaving 4,736 English scheme names on
+    the page is barely a translation at all, and this browse list was doing
+    exactly that — the detail page took a `lang` and the list it came from
+    never had one.
     """
     result = SchemePage(page=max(1, page), page_size=page_size)
     conn = open_corpus(corpus_path)
@@ -142,16 +153,26 @@ def search_schemes(
 
     clause = (" WHERE " + " AND ".join(where)) if where else ""
 
+    # COALESCE per field, not per row: a scheme translated in name but not in
+    # brief shows the translated name and the English brief, rather than
+    # falling back wholesale to English or — worse — showing a blank.
+    translated = lang and lang != "en"
+    name_col = "COALESCE(NULLIF(i.name, ''), s.name)" if translated else "s.name"
+    brief_col = "COALESCE(NULLIF(i.brief, ''), s.brief)" if translated else "s.brief"
+    join = " LEFT JOIN scheme_i18n i ON i.slug = s.slug AND i.lang = ?" if translated else ""
+    join_params = [lang] if translated else []
+
     try:
         result.total = conn.execute(
             f"SELECT COUNT(*) FROM schemes s{clause}", params).fetchone()[0]
         rows = conn.execute(
-            f"""SELECT s.slug, s.name, s.short_title, s.level, s.state, s.ministry,
-                       s.categories, s.tags, s.brief, s.details_md
-                FROM schemes s{clause}
-                ORDER BY s.name
+            f"""SELECT s.slug, {name_col} AS name, s.short_title, s.level,
+                       s.state, s.ministry, s.categories, s.tags,
+                       {brief_col} AS brief, s.details_md
+                FROM schemes s{join}{clause}
+                ORDER BY name
                 LIMIT ? OFFSET ?""",
-            [*params, page_size, (result.page - 1) * page_size],
+            [*join_params, *params, page_size, (result.page - 1) * page_size],
         ).fetchall()
     except sqlite3.OperationalError as exc:
         # A malformed FTS query or a corpus mid-rebuild degrades to empty, never

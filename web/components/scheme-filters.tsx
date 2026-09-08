@@ -1,6 +1,9 @@
 import Link from "next/link";
 
 import type { CatalogMeta } from "@/lib/api";
+import type { Lang } from "@/lib/i18n/config";
+import type { Translate } from "@/lib/i18n";
+import { categoryLabel, levelLabel } from "@/lib/i18n/vocabulary";
 import { cn } from "@/lib/utils";
 
 interface Active {
@@ -27,6 +30,8 @@ function FilterGroup({
   onKey,
   active,
   limit,
+  lang,
+  label,
 }: {
   title: string;
   options: { name: string; count: number }[];
@@ -34,6 +39,13 @@ function FilterGroup({
   onKey: keyof Active;
   active: Active;
   limit?: number;
+  lang: Lang;
+  /**
+   * How to show this option's name. The VALUE stays the English one the
+   * corpus is indexed by — translate that and `?category=…` matches nothing,
+   * silently — so only what the reader sees is swapped.
+   */
+  label?: (lang: Lang, name: string) => string;
 }) {
   if (options.length === 0) return null;
 
@@ -65,9 +77,11 @@ function FilterGroup({
                     : "text-foreground/80 hover:bg-accent",
                 )}
               >
-                <span className="truncate">{option.name}</span>
+                <span className="truncate">
+                  {label ? label(lang, option.name) : option.name}
+                </span>
                 <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                  {option.count.toLocaleString("en-IN")}
+                  {option.count.toLocaleString(`${lang}-IN`)}
                 </span>
               </Link>
             </li>
@@ -82,10 +96,14 @@ export function SchemeFilters({
   meta,
   active,
   className,
+  lang,
+  t,
 }: {
   meta: CatalogMeta;
   active: Active;
   className?: string;
+  lang: Lang;
+  t: Translate;
 }) {
   // "All" is not a state a person lives in — it is how the corpus marks a
   // central scheme, and those are already included in every state's results.
@@ -94,30 +112,36 @@ export function SchemeFilters({
   return (
     <div className={cn("text-sm", className)}>
       <FilterGroup
-        title="Category"
+        title={t("schemes.filter.category")}
         options={meta.categories}
         activeValue={active.category}
         onKey="category"
         active={active}
+        lang={lang}
+        label={categoryLabel}
       />
       <FilterGroup
-        title="Level"
+        title={t("schemes.filter.level")}
         options={meta.levels}
         activeValue={active.level}
         onKey="level"
         active={active}
+        lang={lang}
+        label={levelLabel}
       />
+      {/* State names are proper nouns and stay as published. */}
       <FilterGroup
-        title="State"
+        title={t("schemes.filter.state")}
         options={states}
         activeValue={active.state}
         onKey="state"
         active={active}
         limit={12}
+        lang={lang}
       />
       {states.length > 12 ? (
         <p className="pt-1 text-xs text-muted-foreground">
-          Central schemes are always included alongside the state you pick.
+          {t("check.location.central")}
         </p>
       ) : null}
     </div>

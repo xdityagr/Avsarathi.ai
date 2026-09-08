@@ -14,6 +14,24 @@ import { cn } from "@/lib/utils";
  * these documents are dense — long nested lists of documents and conditions —
  * and need tighter spacing than prose defaults give.
  */
+/**
+ * myScheme's text carries hand-written `<br>` tags inside otherwise plain
+ * Markdown, and because raw HTML is off — rightly — they were reaching the
+ * page as the literal characters "<br>", mid-sentence, in the middle of the
+ * eligibility rules someone is trying to read.
+ *
+ * Turning them into real line breaks fixes that WITHOUT opening the corpus's
+ * HTML up to the renderer. Only the break tags are touched; anything else stays
+ * visible as text, which is the honest failure for content we did not write.
+ */
+function normalise(text: string): string {
+  return text
+    .replace(/<br\s*\/?>/gi, "\n")
+    // A trailing break before a blank line just adds an empty paragraph.
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function Markdown({
   children,
   className,
@@ -22,6 +40,8 @@ export function Markdown({
   className?: string;
 }) {
   if (!children?.trim()) return null;
+  const text = normalise(children);
+  if (!text) return null;
 
   return (
     <div
@@ -59,7 +79,7 @@ export function Markdown({
           ),
         }}
       >
-        {children}
+        {text}
       </ReactMarkdown>
     </div>
   );
