@@ -139,6 +139,23 @@ if _origins:
     logger.info("Cross-origin requests allowed from: %s", ", ".join(_origins))
 
 
+def _commit() -> str:
+    """The commit this process was built from, or "unknown" off a platform."""
+    import os
+    import subprocess
+
+    sha = os.environ.get("RENDER_GIT_COMMIT") or os.environ.get("GIT_COMMIT")
+    if not sha:
+        try:
+            sha = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=2,
+            ).stdout.strip()
+        except Exception:
+            sha = ""
+    return sha[:7] or "unknown"
+
+
 @app.get("/health")
 async def health_check():
     """Health check — 200 when the server is up, and where its data is.
@@ -163,6 +180,13 @@ async def health_check():
             "dir": where["catalogue_dir"],
         },
         "state_dir": where["state_dir"],
+        # Which code is actually running.
+        #
+        # "Did the fix deploy?" was answered all day by probing for a route
+        # that only exists in the newer build — a guess dressed as a check.
+        # Render sets RENDER_GIT_COMMIT on every build, so the answer is just
+        # sitting there.
+        "commit": _commit(),
     }
 
 
