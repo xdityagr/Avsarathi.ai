@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import logging
 import asyncio
+
+import httpx
 from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
 
@@ -238,3 +240,21 @@ async def send_whatsapp_media(
             return False
 
     return False
+
+
+async def fetch_media(url: str) -> tuple[bytes, str]:
+    """Download a voice note (or any media) Twilio has told us about.
+
+    Twilio's media URLs are not public: they need the account's own basic-auth
+    credentials. Fetching without them returns a 401 that looks like a missing
+    file, which is a confusing way to discover that voice notes do not work.
+    """
+    settings = get_settings()
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
+        response = await client.get(
+            url,
+            auth=(settings.twilio_account_sid, settings.twilio_auth_token),
+            follow_redirects=True,
+        )
+        response.raise_for_status()
+        return response.content, response.headers.get("content-type", "audio/ogg")

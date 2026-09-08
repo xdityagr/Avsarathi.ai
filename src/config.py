@@ -28,6 +28,38 @@ class Settings(BaseSettings):
     )
 
     # --- Webhook ---
+    # ---- WhatsApp via Meta's Cloud API -----------------------------------
+    #
+    # Talking to Meta directly rather than through Twilio: one less party
+    # between a person's message and the answer, one less bill, and the
+    # sandbox-number restriction goes away. Everything below comes from the
+    # app's dashboard except the verify token, which we invent and then tell
+    # Meta about.
+    whatsapp_provider: str = Field(
+        default="meta",
+        description="'meta' (Cloud API) or 'twilio' (legacy)",
+    )
+    whatsapp_access_token: str = Field(
+        default="",
+        description="Meta access token — a permanent System User token in production",
+    )
+    whatsapp_phone_number_id: str = Field(
+        default="",
+        description="Phone Number ID from the WhatsApp app dashboard (not the number)",
+    )
+    whatsapp_verify_token: str = Field(
+        default="",
+        description="A string we choose; Meta echoes it when registering the webhook",
+    )
+    whatsapp_app_secret: str = Field(
+        default="",
+        description="App Secret, used to verify X-Hub-Signature-256 on every payload",
+    )
+    whatsapp_api_version: str = Field(
+        default="v21.0",
+        description="Graph API version",
+    )
+
     webhook_base_url: str = Field(
         default="http://localhost:8000",
         description="Public base URL for webhook (ngrok/cloudflare tunnel)",
@@ -90,6 +122,11 @@ class Settings(BaseSettings):
         description="Model for generation on cache miss"
     )
 
+    deepgram_api_key: str = Field(
+        default="",
+        description="Deepgram, for speech-to-text on WhatsApp voice notes",
+    )
+
     # --- Financial literacy (PS impact goal: "enhance financial literacy") ---
     moneylender_monthly_rate_pct: float = Field(
         default=5.0,
@@ -109,6 +146,11 @@ class Settings(BaseSettings):
         "env_file": ("src/.env", ".env"),
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
+        # An unrecognised key in .env must never take the whole app down. It
+        # did once: a teammate added DEEPGRAM_API_KEY and every request started
+        # failing on a validation error about an environment variable, which is
+        # a spectacularly unhelpful way to learn that a config file changed.
+        "extra": "ignore",
     }
 
 

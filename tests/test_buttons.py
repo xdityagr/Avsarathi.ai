@@ -1,8 +1,14 @@
+"""Button-payload parsing in the legacy intake graph.
+
+The worker no longer uses this graph — see tests/test_whatsapp_worker.py
+for what WhatsApp actually does now. These stay because src/graph.py
+still exists and its parsing is still correct.
+"""
+
 import pytest
 from unittest.mock import AsyncMock, patch
 from src.graph import build_graph, ConversationState
 from src.config import get_settings
-from src.worker import MessageWorker
 import asyncio
 
 
@@ -80,67 +86,3 @@ async def test_fallback_to_text_parsing_project_type(graph, settings):
     )
     assert result["project_type"] == "business"
     assert result["intake_step"] == "awaiting_cost"
-
-
-@pytest.mark.asyncio
-async def test_worker_response_routing():
-    # Test that worker correctly calls send_whatsapp_buttons vs send_whatsapp_message
-    queue = asyncio.Queue()
-    worker = MessageWorker(queue)
-    
-    # Mock checkpointer and graph
-    worker._checkpointer = AsyncMock()
-    worker._compiled_graph = AsyncMock()
-    worker._rate_limiter.allow = lambda user_id: True
-    
-    # Scenario 1: Button message configured and should be sent
-    with patch("src.worker.send_whatsapp_buttons", new_callable=AsyncMock) as mock_buttons, \
-         patch("src.worker.send_whatsapp_message", new_callable=AsyncMock) as mock_message, \
-         patch("src.worker.get_settings") as mock_settings:
-             
-        mock_settings.return_value.use_button_messages = True
-        worker._compiled_graph.ainvoke.return_value = {
-            "response": "Fallback text",
-            "response_content_sid": "HX123",
-        }
-        
-        await worker._process_message({"from_number": "user1", "body": "hi", "message_sid": "msg1", "button_payload": ""}, 1)
-        
-        mock_buttons.assert_called_once_with(
-            to="user1",
-            content_sid="HX123",
-            fallback_body="Fallback text"
-        )
-        mock_message.assert_not_called()
-
-    # Scenario 2: Button message NOT configured, fallback to text
-    with patch("src.worker.send_whatsapp_buttons", new_callable=AsyncMock) as mock_buttons, \
-         patch("src.worker.send_whatsapp_message", new_callable=AsyncMock) as mock_message, \
-         patch("src.worker.get_settings") as mock_settings:
-             
-        mock_settings.return_value.use_button_messages = False
-        worker._compiled_graph.ainvoke.return_value = {
-            "response": "Fallback text",
-            "response_content_sid": "HX123", # Graph sets it, but settings disabled it
-        }
-        
-        await worker._process_message({"from_number": "user1", "body": "hi", "message_sid": "msg1", "button_payload": ""}, 1)
-        
-        mock_buttons.assert_not_called()
-        mock_message.assert_called_once_with(to="user1", body="Fallback text")
-
-    # Scenario 3: Regular text message (no content_sid)
-    with patch("src.worker.send_whatsapp_buttons", new_callable=AsyncMock) as mock_buttons, \
-         patch("src.worker.send_whatsapp_message", new_callable=AsyncMock) as mock_message, \
-         patch("src.worker.get_settings") as mock_settings:
-             
-        mock_settings.return_value.use_button_messages = True
-        worker._compiled_graph.ainvoke.return_value = {
-            "response": "Regular text",
-            "response_content_sid": "", 
-        }
-        
-        await worker._process_message({"from_number": "user1", "body": "hi", "message_sid": "msg1", "button_payload": ""}, 1)
-        
-        mock_buttons.assert_not_called()
-        mock_message.assert_called_once_with(to="user1", body="Regular text")

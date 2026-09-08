@@ -226,3 +226,63 @@ class TestConversation:
             for m in ["business", "120000", "280000", "SC", "female", place["id"]]:
                 r = await turn(sid, m)
             assert r["done"] is True, f"{place['id']} did not complete"
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp
+# ---------------------------------------------------------------------------
+
+class TestWhatsAppRendering:
+    """WhatsApp has no cards, so everything is one text message — and its markup
+    is not Markdown. Getting that wrong shows literal asterisks to someone who
+    may already be reading with difficulty."""
+
+    def test_bold_becomes_single_asterisks(self):
+        from src.whatsapp_brain import to_whatsapp_markup
+        assert to_whatsapp_markup("**Micro Finance Scheme**") == "*Micro Finance Scheme*"
+
+    def test_markdown_furniture_is_stripped(self):
+        from src.whatsapp_brain import to_whatsapp_markup
+        out = to_whatsapp_markup("## Heading\n- one\n- two\n[myScheme](https://x.in)")
+        assert "#" not in out
+        assert out.count("•") == 2
+        assert "https://x.in" in out and "[" not in out
+
+    def test_messages_are_clipped_to_one_whatsapp_message(self):
+        from src.whatsapp_brain import _clip, MAX_MESSAGE_CHARS
+        long = "\n".join(f"line {i} of a very long reply" for i in range(200))
+        clipped = _clip(long)
+        assert len(clipped) <= MAX_MESSAGE_CHARS + 1
+        assert clipped.endswith("…")
+
+    def test_cards_render_without_their_labels(self):
+        from src.whatsapp_brain import render_cards
+        text = render_cards([
+            {"kind": "eligibility", "name": "Widow Pension", "verdict": "NOT_MATCHED",
+             "unmet": ["caste"], "unknown": []},
+            {"kind": "scheme", "best": True, "name": "Micro Finance Scheme",
+             "rate": 6.5, "loan": "₹1,08,000", "instalment": "₹10,801",
+             "instalment_count": 11, "interest": "₹12,568"},
+        ])
+        assert "❌ *Widow Pension*" in text
+        assert "caste" in text
+        assert "₹10,801 × 11" in text
+        assert "cheapest" in text
+
+    def test_language_defaults_to_english_until_a_script_appears(self):
+        from src.whatsapp_brain import remember_language, _CONTEXT
+        phone = "whatsapp:+910000000000"
+        _CONTEXT.pop(phone, None)
+        assert remember_language(phone, "hello") == "en"
+        assert remember_language(phone, "मुझे पेंशन चाहिए") == "hi"
+        # And it stays switched, even when the next message is just a digit.
+        assert remember_language(phone, "2") == "hi"
+
+    def test_a_bare_number_picks_the_option_it_stood_for(self):
+        from src.whatsapp_brain import remember_options, resolve_numbered_choice
+        phone = "whatsapp:+910000000001"
+        remember_options(phone, [{"value": "business"}, {"value": "pension"}])
+        assert resolve_numbered_choice(phone, "2") == "pension"
+        # An amount is not a menu choice.
+        assert resolve_numbered_choice(phone, "2 lakh") == "2 lakh"
+        assert resolve_numbered_choice(phone, "9") == "9"

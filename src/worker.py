@@ -24,7 +24,9 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from src.config import get_settings
 from src.graph import build_graph
-from src.whatsapp import send_whatsapp_message, send_whatsapp_buttons
+from src import meta_whatsapp as meta
+from src import speech
+from src.whatsapp_brain import known_language, reply as brain_reply
 
 logger = logging.getLogger(__name__)
 
@@ -101,29 +103,10 @@ class MessageWorker:
         and start worker tasks."""
         settings = get_settings()
 
-        # Create the checkpointer — this manages its own SQLite tables
-        # for conversation state (architecture.md Non-negotiable #2)
-        #
-        # from_conn_string() returns an ASYNC CONTEXT MANAGER, not a saver. The
-        # previous code called .setup() on the context manager itself, which
-        # raised AttributeError the first time the app was actually started —
-        # the unit tests stub _checkpointer out, so nothing caught it until the
-        # server ran for real.
-        #
-        # A worker with start()/stop() can't use `async with` around its whole
-        # life, so enter the context explicitly here and exit it in stop().
-        self._checkpointer_cm = AsyncSqliteSaver.from_conn_string(
-            settings.database_path,
-        )
-        self._checkpointer = await self._checkpointer_cm.__aenter__()
-        await self._checkpointer.setup()
-
-        # Build and compile the graph with the checkpointer
-        graph_builder = build_graph()
-        self._compiled_graph = graph_builder.compile(
-            checkpointer=self._checkpointer,
-        )
-
+        # No graph and no checkpointer any more. WhatsApp answers through the
+        # same brain as the website, which keeps its own short history per
+        # number — so the AsyncSqliteSaver that once broke startup is gone
+        # rather than merely fixed.
         # Start worker coroutines
         for i in range(settings.worker_count):
             _spawn_task(self._worker_loop(worker_id=i))
@@ -180,7 +163,7 @@ class MessageWorker:
                 # Send error message to user — never let the bot go silent
                 # (phrases.md §7 — fallback/error states)
                 try:
-                    await send_whatsapp_message(
+                    await meta.send_text(
                         to=msg.get("from_number", ""),
                         body=(
                             "Sorry, having a little trouble right now — "
@@ -191,6 +174,30 @@ class MessageWorker:
                     logger.error("Failed to send error message to user", exc_info=True)
             finally:
                 self.queue.task_done()
+
+    @staticmethod
+    async def _transcribe_voice_note(user_id: str, msg: dict) -> str:
+        """A voice note, in the language this person has been writing in."""
+        if not speech.is_available():
+            logger.info("Voice note from %s but no Deepgram key", user_id[:10] + "…")
+            return ""
+        try:
+            audio, content_type = await meta.fetch_media(msg["media_id"])
+        except Exception as exc:                              # noqa: BLE001
+            logger.warning("Could not fetch voice note: %s", exc)
+            return ""
+
+        result = await speech.transcribe(
+            audio,
+            content_type=msg.get("media_type") or content_type,
+            language=known_language(user_id),
+        )
+        if not result.ok:
+            return ""
+        if result.unclear:
+            logger.info("Low-confidence transcript (%.2f) from %s",
+                        result.confidence, user_id[:10] + "…")
+        return result.text
 
     async def _process_message(self, msg: dict, worker_id: int) -> None:
         """Process a single message through the LangGraph graph."""
@@ -208,43 +215,49 @@ class MessageWorker:
         # Rate-limit check
         if not self._rate_limiter.allow(user_id):
             logger.warning("Rate limit exceeded for %s", user_id[:10] + "...")
-            await send_whatsapp_message(
+            await meta.send_text(
                 to=user_id,
                 body="You're sending messages too quickly. Please wait a moment.",
             )
             return
 
-        # Invoke the LangGraph graph with checkpointer
-        # thread_id = WhatsApp number → one conversation thread per user
-        config = {"configurable": {"thread_id": user_id}}
+        # A voice note has no body. Transcribe it first, then it is just a
+        # message like any other — which is the point: the brain should never
+        # need to know how the words arrived.
+        if not body and msg.get("media_id"):
+            body = await self._transcribe_voice_note(user_id, msg)
+            if not body:
+                await meta.send_text(
+                    to=user_id,
+                    body=(
+                        "I could not make out that voice note. Please try again "
+                        "somewhere quieter, or type your question instead."
+                    ),
+                )
+                return
 
-        # The graph reads state from the checkpointer (atomic read),
-        # processes the message, and writes state back (atomic write).
-        # This is Non-negotiable #2 in architecture.md.
-        result = await self._compiled_graph.ainvoke(
-            {
-                "message": body,
-                "button_payload": msg.get("button_payload", ""),
-            },
-            config=config,
-        )
-
-        # Send response (decoupled from webhook — message chain step 7)
-        settings = get_settings()
-        content_sid = result.get("response_content_sid", "")
-        response_text = result.get("response", "")
-        
-        success = False
-        if content_sid and settings.use_button_messages:
-            success = await send_whatsapp_buttons(
-                to=user_id,
-                content_sid=content_sid,
-                fallback_body=response_text,
+        # One brain, two channels. The website and WhatsApp answer the same
+        # question the same way — the alternative is that the channel reaching
+        # the most people stays the worst one.
+        try:
+            response_text = await brain_reply(user_id, body)
+        except Exception as exc:                              # noqa: BLE001
+            logger.exception("Reply failed for %s: %s", message_sid, exc)
+            response_text = (
+                "Something went wrong at our end. Please send your message "
+                "again in a moment — nothing you told me is lost."
             )
-        elif response_text:
-            success = await send_whatsapp_message(to=user_id, body=response_text)
-            
-        if response_text or content_sid:
+
+        success = False
+        if response_text:
+            success = await meta.send_text(to=user_id, body=response_text)
+        else:
+            # An empty reply is deliberate: it means this person has opted out.
+            # Sending them anything at all would defeat the point.
+            logger.info("Nothing to send for %s (opted out)", user_id[:10] + "…")
+            return
+
+        if response_text:
             if success:
                 logger.info(
                     "Response sent for message %s (worker %d)",
