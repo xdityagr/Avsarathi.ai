@@ -1,6 +1,8 @@
 "use client";
 
+import { useLanguage } from "@/components/language-provider";
 import type { Option } from "@/lib/facets";
+import type { StringKey } from "@/lib/i18n/keys";
 import { cn } from "@/lib/utils";
 
 /**
@@ -25,6 +27,7 @@ export function OptionRow({
   onSelect: (value: string) => void;
   className?: string;
 }) {
+  const { t } = useLanguage();
   return (
     <div className={className}>
       <p className="text-sm font-medium">{label}</p>
@@ -44,7 +47,7 @@ export function OptionRow({
                   : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
               )}
             >
-              {option.label}
+              {t(option.key as StringKey)}
             </button>
           );
         })}

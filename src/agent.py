@@ -26,12 +26,13 @@ import json
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from src.calculator import calculate_emi
 from src.catalog import catalog_meta, get_scheme, search_schemes
 from src.config import SCHEMES, get_settings
 from src.discovery import Facets, discover_with_credit, evaluate_scheme
+from src.i18n import LANGUAGES
 from src.routing import haversine_km, utilisation_note
 from src.schemes import UserProfile, evaluate_eligibility, format_rupees
 from src.seed import partners_near
@@ -128,8 +129,8 @@ four rounds of tool calls, and a second search for the same thing spends one
 that eligibility checking needed.
 
 HOW YOU SPEAK
-- Reply in the language the person wrote in. If they wrote in Hindi, reply in
-  Hindi. Never announce that you are switching language.
+- Reply in the language named below, always. Never announce the language, never
+  apologise for it, never offer to switch.
 - Short sentences. No jargon. Assume the reader may be reading with difficulty,
   and may be reading this aloud to someone else.
 - Never promise approval. Schemes have conditions in prose we have not read, so
@@ -139,17 +140,51 @@ HOW YOU SPEAK
   required.
 
 SHAPE OF AN ANSWER
-- Two or three sentences first, in plain words, answering what was asked.
-- Then the specifics, as a short list. One scheme per line: its name, the one
-  thing it gives, and the single condition that matters most for this person.
-- When a scheme does not fit, say which condition blocked it. "This one is for
-  OBC applicants" is useful; "you may not be eligible" is not.
-- End with the one next step worth taking, if there is one.
-- Never pad. If the honest answer is two lines, write two lines.
 
-The interface already renders the structured cards a tool returned, so do not
-repeat a table of figures the reader can see. Say what they mean instead."""
+Every scheme a tool returned is ALREADY on the screen as a card, with its name,
+its summary and its conditions. The reader can see them. Do not list them again.
 
+This is the single most common way to make this interface worse: the cards say
+everything, and then the same six schemes are repeated underneath in bold text,
+so the person scrolls through the same list twice and trusts neither copy.
+
+So write the part the cards cannot:
+- Two to four sentences. What the answer to their question actually is.
+- The judgement a list cannot make: which one to try FIRST, and why that one.
+- The condition most likely to trip them up, named plainly. "This is for OBC
+  applicants, and you said you are SC" is useful; "you may not be eligible" is
+  not.
+- The one next step worth taking.
+
+Name a scheme only when you are saying something about it that is not on its
+card. Never reproduce a card as a bulleted list. Never restate rupee figures
+that a card already shows.
+
+You may use light Markdown — **bold** for a scheme name you are singling out,
+and short `-` lists for steps. Do not build tables or headings; this is read on
+a phone."""
+
+
+
+# Appended when the interface has a chosen language. Deliberately emphatic:
+# every model tested replies in the script it was written to unless told
+# otherwise, and that default is wrong for this audience.
+LANGUAGE_RULE = """
+
+THE LANGUAGE OF THIS REPLY: {name} ({native}).
+Write every word of your reply in {name}, in its own script.
+
+This is the language the person chose in the interface, and it overrides
+whatever script their message happens to arrive in. Someone who reads only
+{name} may still type in English letters, because that is what their phone
+keyboard offers most easily — replying in English because they typed "helo"
+hands them an answer they cannot read, which is the exact failure this product
+exists to prevent.
+
+Two things stay exactly as the tools returned them: the names of schemes,
+offices and government programmes, which are published in a fixed form and have
+to be recognisable at a counter, and rupee figures, which are already
+formatted."""
 
 @dataclass
 class ToolCall:
@@ -633,20 +668,32 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 # The loop
 # ---------------------------------------------------------------------------
 
-async def respond(
+async def stream(
     message: str,
     history: Optional[list[dict]] = None,
     context: Optional[dict] = None,
-) -> AgentReply:
-    """One turn: think, look things up, answer.
+    language: Optional[str] = None,
+) -> "AsyncIterator[dict]":
+    """One turn, reported as it happens.
+
+    Yields `{"type": "tool", ...}` the moment each lookup returns, then
+    `{"type": "text", ...}` with the written answer, then `{"type": "done"}`.
+
+    A generator rather than a single return because a turn takes twenty to sixty
+    seconds — four model round-trips and up to seven lookups — and a person
+    watching a spinner for a minute assumes it has hung. Showing "searched the
+    corpus, 6 found" as it lands is both more honest and less anxious than a
+    progress message we made up.
 
     `context` carries what the interface already knows (state, caste, income),
     so the person is not asked again for something they typed into the wizard
-    five seconds ago.
+    five seconds ago. `language` is the one chosen in the interface, and it wins
+    over the script the message happens to arrive in.
     """
     settings = get_settings()
     if not settings.gemini_api_key:
-        return AgentReply(text="", used_model=False)
+        yield {"type": "unavailable", "quota_exhausted": False}
+        return
 
     from langchain_core.messages import (
         AIMessage, HumanMessage, SystemMessage, ToolMessage,
@@ -654,6 +701,9 @@ async def respond(
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     system = SYSTEM_PROMPT
+    if language and language in LANGUAGES:
+        meta = LANGUAGES[language]
+        system += LANGUAGE_RULE.format(name=meta["name"], native=meta["native"])
     if context:
         known = {k: v for k, v in context.items() if v not in (None, "", [])}
         if known:
@@ -681,7 +731,8 @@ async def respond(
             chain.append(name)
     if not chain:
         # Everything is in cooldown. Say so rather than trying anyway.
-        return AgentReply(used_model=False, quota_exhausted=True)
+        yield {"type": "unavailable", "quota_exhausted": True}
+        return
 
     state: dict[str, Any] = {"index": 0, "quota": False}
 
@@ -732,12 +783,15 @@ async def respond(
         if response is None:
             # No model answered. The scripted flow takes over unless the reason
             # was quota, which the interface should state plainly.
-            return AgentReply(used_model=False, quota_exhausted=reply.quota_exhausted)
+            yield {"type": "unavailable", "quota_exhausted": reply.quota_exhausted}
+            return
 
         calls = getattr(response, "tool_calls", None) or []
         if not calls:
             reply.text = _text_of(response)
-            return reply
+            yield {"type": "text", "text": reply.text, "model": reply.model}
+            yield {"type": "done"}
+            return
 
         messages.append(response)
         for call in calls:
@@ -754,12 +808,15 @@ async def respond(
                     payload, cards, summary = {"error": str(exc)}, [], "failed"
 
             reply.cards.extend(cards)
-            reply.trace.append(ToolCall(
+            step = ToolCall(
                 name=name or "",
                 label=TOOL_LABELS.get(name or "", "Looked something up"),
                 arguments=args,
                 summary=summary,
-            ))
+            )
+            reply.trace.append(step)
+            yield {"type": "tool", "name": step.name, "label": step.label,
+                   "summary": step.summary, "cards": cards}
             messages.append(ToolMessage(
                 content=json.dumps(payload, ensure_ascii=False, default=str),
                 tool_call_id=call.get("id") or name or "tool",
@@ -786,6 +843,34 @@ async def respond(
         )))
         final = await invoke(with_tools=False)
         reply.text = _text_of(final) if final is not None else ""
+
+    yield {"type": "text", "text": reply.text, "model": reply.model}
+    yield {"type": "done"}
+
+
+async def respond(
+    message: str,
+    history: Optional[list[dict]] = None,
+    context: Optional[dict] = None,
+    language: Optional[str] = None,
+) -> AgentReply:
+    """The whole turn at once, for callers that cannot stream — WhatsApp, and
+    anything that just wants the answer."""
+    reply = AgentReply(used_model=True)
+    async for event in stream(message, history, context, language):
+        kind = event.get("type")
+        if kind == "tool":
+            reply.cards.extend(event.get("cards") or [])
+            reply.trace.append(ToolCall(
+                name=event.get("name", ""), label=event.get("label", ""),
+                summary=event.get("summary", ""),
+            ))
+        elif kind == "text":
+            reply.text = event.get("text", "")
+            reply.model = event.get("model", "")
+        elif kind == "unavailable":
+            return AgentReply(used_model=False,
+                              quota_exhausted=bool(event.get("quota_exhausted")))
     return reply
 
 

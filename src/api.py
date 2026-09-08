@@ -12,6 +12,7 @@ No LLM on this path. Every figure is deterministic and reproducible.
 from __future__ import annotations
 
 import base64
+import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -19,14 +20,19 @@ from typing import Optional
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from src.agent import is_available as agent_is_available, respond as agent_respond
+from src.agent import (
+    is_available as agent_is_available,
+    respond as agent_respond,
+    stream as agent_stream,
+)
 from src.calculator import calculate_emi
 from src.catalog import catalog_meta, get_scheme, search_schemes
 from src.config import SCHEMES, get_settings
 from src.corpus import load_corpus
-from src.discovery import Facets, discover_with_credit
+from src.discovery import Facets, discover_with_credit, evaluate_scheme
 from src.geo import lookup_pin, reverse_geocode
 from src.literacy import (
     format_fraud_shield,
@@ -528,6 +534,9 @@ class AgentRequest(BaseModel):
     message: str
     history: list[dict] = Field(default_factory=list)
     context: dict = Field(default_factory=dict)
+    """The language chosen in the interface. It decides the reply's language,
+    not the script the message arrived in."""
+    language: Optional[str] = None
 
 
 @router.get("/agent/status")
@@ -546,6 +555,7 @@ async def ask_agent(request: AgentRequest) -> dict:
     """Answer a question by looking things up, and show what was looked up."""
     reply = await agent_respond(
         request.message, history=request.history, context=request.context,
+        language=request.language,
     )
     return {
         "text": reply.text,
@@ -559,3 +569,74 @@ async def ask_agent(request: AgentRequest) -> dict:
         "model": reply.model,
         "quota_exhausted": reply.quota_exhausted,
     }
+
+
+class SchemeEligibilityRequest(BaseModel):
+    """The same optional answers as /api/discover, aimed at one scheme."""
+    caste: Optional[str] = None
+    gender: Optional[str] = None
+    age: Optional[int] = Field(default=None, ge=0, le=120)
+    state: Optional[str] = None
+    residence: Optional[str] = None
+    family_income: Optional[float] = Field(default=None, ge=0)
+    is_bpl: Optional[bool] = None
+    disability: Optional[bool] = None
+    minority: Optional[bool] = None
+    is_student: Optional[bool] = None
+    occupation: Optional[str] = None
+    employment_status: Optional[str] = None
+    marital_status: Optional[str] = None
+
+
+@router.post("/eligibility/{slug}")
+async def scheme_eligibility(slug: str, request: SchemeEligibilityRequest) -> dict:
+    """Am I eligible for THIS scheme, condition by condition?
+
+    The question someone asks once they have a scheme name in hand, which the
+    general wizard answers only indirectly — it returns hundreds of matches and
+    leaves them to find the one they came for.
+    """
+    facets = Facets(**request.model_dump())
+    match = evaluate_scheme(slug, facets)
+    if match is None:
+        raise HTTPException(status_code=404, detail=f"No scheme with slug '{slug}'")
+    return {
+        "slug": match.slug,
+        "name": match.name.strip(),
+        "state": match.state,
+        "brief": match.brief,
+        "verdict": match.strength.value,
+        "meets": match.matched_on,
+        "unknown": match.unknown,
+        "unmet": match.unmet,
+        "source_url": match.source_url,
+    }
+
+
+@router.post("/agent/stream")
+async def ask_agent_streaming(request: AgentRequest):
+    """The same answer as /api/agent, but reported as it is worked out.
+
+    A turn takes twenty to sixty seconds — several model round-trips and up to
+    seven lookups — and a person watching a spinner that long assumes it has
+    hung. Server-sent events let the interface show each lookup as it lands,
+    which is both more honest and less anxious than inventing a progress bar.
+    """
+    async def events():
+        try:
+            async for event in agent_stream(
+                request.message, history=request.history,
+                context=request.context, language=request.language,
+            ):
+                yield f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+        except Exception as exc:                          # noqa: BLE001
+            logger.warning("Agent stream failed: %s", exc)
+            yield f"data: {json.dumps({'type': 'unavailable', 'quota_exhausted': False})}\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        # Without this, a proxy that buffers will hold every event until the end
+        # and undo the entire point of streaming.
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

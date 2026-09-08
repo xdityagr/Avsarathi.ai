@@ -24,6 +24,11 @@ import { cn } from "@/lib/utils";
  * button that says it will: a page that demands location on load is a page
  * people reflexively deny and then distrust.
  */
+/** Ask for the location again, from anywhere. */
+export function askForLocation(): void {
+  window.dispatchEvent(new Event("avsarathi:ask-location"));
+}
+
 export function LocationGate({ states }: { states: string[] }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
@@ -44,6 +49,15 @@ export function LocationGate({ states }: { states: string[] }) {
     // all. The cleanup is the whole mechanism; let it do its job.
     const timer = setTimeout(() => setOpen(true), 900);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Anywhere in the interface can ask for this again — someone who skipped on
+  // arrival, or whose answer is now wrong, must not be stuck with it. Dismissal
+  // is remembered; it is not a life sentence.
+  useEffect(() => {
+    const reopen = () => setOpen(true);
+    window.addEventListener("avsarathi:ask-location", reopen);
+    return () => window.removeEventListener("avsarathi:ask-location", reopen);
   }, []);
 
   const close = useCallback((remember = true) => {

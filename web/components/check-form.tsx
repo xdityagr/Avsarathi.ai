@@ -28,11 +28,14 @@ import { cn } from "@/lib/utils";
 export function CheckForm({
   meta,
   initialState,
+  focusSlug,
   className,
 }: {
   meta: CatalogMeta;
   /** Remembered from the location question, so it is not asked twice. */
   initialState?: string | null;
+  /** Set when the person came from one scheme's page to check that scheme. */
+  focusSlug?: string | null;
   className?: string;
 }) {
   const { t } = useLanguage();
@@ -88,7 +91,12 @@ export function CheckForm({
 
   const submit = () => {
     startNavigating(() => {
-      router.push(`/check/results?${answersToQuery(answers)}`);
+      const query = answersToQuery(answers);
+      router.push(
+        focusSlug
+          ? `/check/results?${query}&scheme=${encodeURIComponent(focusSlug)}`
+          : `/check/results?${query}`,
+      );
     });
   };
 

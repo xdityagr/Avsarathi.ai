@@ -60,21 +60,23 @@ interface Recommendation {
 }
 
 const PURPOSES = [
-  { value: "business", label: "Start or grow a business" },
-  { value: "education", label: "Study or a course" },
+  { value: "business", key: "opt.purpose.business" },
+  { value: "education", key: "opt.purpose.education" },
 ];
 
+// NSFDC's own category codes, so these are upper-case where the wizard's are
+// lower-case machine values. Only the label is shared.
 const CATEGORIES = [
-  { value: "SC", label: "Scheduled Caste" },
-  { value: "ST", label: "Scheduled Tribe" },
-  { value: "OBC", label: "OBC" },
-  { value: "GENERAL", label: "General" },
+  { value: "SC", key: "opt.caste.sc" },
+  { value: "ST", key: "opt.caste.st" },
+  { value: "OBC", key: "opt.caste.obc" },
+  { value: "GENERAL", key: "opt.caste.general" },
 ];
 
 const GENDERS = [
-  { value: "female", label: "Woman" },
-  { value: "male", label: "Man" },
-  { value: "other", label: "Other" },
+  { value: "female", key: "opt.gender.female" },
+  { value: "male", key: "opt.gender.male" },
+  { value: "other", key: "opt.gender.other" },
 ];
 
 const rupees = (value: number) =>

@@ -137,7 +137,10 @@ export default async function SchemePage({
               Answer a few optional questions and we will check this scheme along
               with every other one you might be entitled to.
             </p>
-            <ButtonLink href="/check" className="mt-4 h-10 w-full">
+            <ButtonLink
+              href={`/check?scheme=${encodeURIComponent(scheme.slug)}`}
+              className="mt-4 h-10 w-full"
+            >
               Check my eligibility
             </ButtonLink>
           </div>

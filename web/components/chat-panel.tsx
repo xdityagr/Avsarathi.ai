@@ -2,7 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   AlertTriangle,
   ArrowUp,
@@ -21,6 +27,9 @@ import {
 } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
+import { readPlaceCookie } from "@/lib/i18n/config";
+import { Markdown } from "@/components/markdown";
+import { VoiceButton } from "@/components/voice-button";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -57,14 +66,28 @@ const TOOL_ICONS: Record<string, typeof Search> = {
   corpus_stats: BarChart3,
 };
 
-export function ChatPanel({ className }: { className?: string }) {
+export function ChatPanel({
+  className,
+  showHeading = true,
+}: {
+  className?: string;
+  /** False on the assistant page, where the rail already carries the title. */
+  showHeading?: boolean;
+}) {
   const { lang, t } = useLanguage();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [chips, setChips] = useState<Chip[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  /** Lookups already finished in the turn still running. */
+  const [live, setLive] = useState<Trace[]>([]);
   const [agentic, setAgentic] = useState<boolean | null>(null);
+  const knownState = useSyncExternalStore(
+    () => () => {},
+    readPlaceCookie,
+    () => null,
+  );
   const sessionRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -113,36 +136,93 @@ export function ChatPanel({ className }: { className?: string }) {
       setBusy(true);
       setFailed(false);
       setChips([]);
+      setLive([]);
       const history = turns.slice(-8).map((turn) => ({
         role: turn.from === "user" ? "user" : "assistant",
         text: turn.text,
       }));
       setTurns((prev) => [...prev, { from: "user", text: message }]);
+
+      const trace: Trace[] = [];
+      const cards: Card[] = [];
+      let answered = false;
+
       try {
-        const response = await fetch("/api/agent", {
+        const response = await fetch("/api/agent/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, history, context: {} }),
+          // The interface language, not the script the message arrived in: a
+          // person who reads only Odia may still type in English letters.
+          // What the interface already knows travels with the question. Without
+        // this the assistant asks "which state do you live in?" of someone who
+        // answered exactly that on the way in — which reads as not listening.
+        body: JSON.stringify({
+          message,
+          history,
+          context: knownState ? { state: knownState } : {},
+          language: lang,
+        }),
         });
-        if (!response.ok) throw new Error(String(response.status));
-        const data = await response.json();
-        if (!data.used_model) {
-          // The key went away mid-conversation. Fall back rather than sit mute.
-          setAgentic(false);
-          await startScripted(message);
-          return;
+        if (!response.ok || !response.body) throw new Error(String(response.status));
+
+        // Server-sent events, read by hand — the browser's EventSource cannot
+        // POST, and the question has to go in the body.
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // Events are separated by a blank line; a partial one stays in the
+          // buffer until the rest of it arrives.
+          const chunks = buffer.split("\n\n");
+          buffer = chunks.pop() ?? "";
+          for (const chunk of chunks) {
+            const line = chunk
+              .split("\n")
+              .find((l) => l.startsWith("data: "));
+            if (!line) continue;
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === "tool") {
+              trace.push({ name: event.name, label: event.label, summary: event.summary });
+              cards.push(...(event.cards ?? []));
+              // Shown while the rest of the turn is still running, so the wait
+              // is legible rather than a spinner of unknown length.
+              setLive([...trace]);
+            } else if (event.type === "text") {
+              answered = true;
+              setTurns((prev) => [
+                ...prev,
+                { from: "bot", text: event.text, cards: [...cards], trace: [...trace] },
+              ]);
+            } else if (event.type === "unavailable") {
+              setAgentic(false);
+              await startScripted(message);
+              return;
+            }
+          }
         }
-        setTurns((prev) => [
-          ...prev,
-          { from: "bot", text: data.text, cards: data.cards, trace: data.trace },
-        ]);
+
+        if (!answered && (trace.length || cards.length)) {
+          // Lookups happened but no prose arrived. The cards still carry the
+          // facts, so show them rather than dropping the turn.
+          setTurns((prev) => [
+            ...prev,
+            { from: "bot", text: "", cards: [...cards], trace: [...trace] },
+          ]);
+        }
       } catch {
         setFailed(true);
       } finally {
         setBusy(false);
+        setLive([]);
       }
     },
-    [turns, startScripted],
+    [turns, startScripted, lang, knownState],
   );
 
   /* ------------------------------------------------------------------ mode */
@@ -187,7 +267,7 @@ export function ChatPanel({ className }: { className?: string }) {
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
           {empty || turns.length <= 2 ? (
-            <Opening onPick={send} agentic={agentic} />
+            <Opening onPick={send} agentic={agentic} showHeading={showHeading} />
           ) : null}
 
           <div className="space-y-6">
@@ -206,9 +286,9 @@ export function ChatPanel({ className }: { className?: string }) {
                       <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
                         <Sparkles className="size-3.5" />
                       </span>
-                      <p className="min-w-0 whitespace-pre-wrap text-[0.95rem] leading-relaxed text-foreground">
-                        {turn.text}
-                      </p>
+                      {/* The model writes light Markdown — **bold** for a scheme
+                          name, short lists for steps. Rendered, not shown raw. */}
+                      <Markdown className="min-w-0 flex-1">{turn.text}</Markdown>
                     </div>
                   ) : null}
                   {turn.cards?.length ? (
@@ -224,11 +304,14 @@ export function ChatPanel({ className }: { className?: string }) {
           </div>
 
           {busy ? (
-            <div className="mt-6 flex items-center gap-3 text-sm text-muted-foreground">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                <Loader2 className="size-3.5 animate-spin text-primary" />
-              </span>
-              {t("chat.thinking")}
+            <div className="mt-6 space-y-3">
+              {live.length ? <TraceList trace={live} /> : null}
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary">
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                </span>
+                {t("chat.thinking")}
+              </div>
             </div>
           ) : null}
 
@@ -292,6 +375,11 @@ export function ChatPanel({ className }: { className?: string }) {
               }}
               className="max-h-40 min-h-[2.75rem] flex-1 resize-none bg-transparent px-2.5 py-2.5 text-base outline-none placeholder:text-muted-foreground disabled:opacity-60"
             />
+            <VoiceButton
+              disabled={busy}
+              onInterim={(text) => setDraft(text)}
+              onTranscript={(text) => send(text)}
+            />
             <Button
               type="button"
               variant="ghost"
@@ -325,27 +413,35 @@ export function ChatPanel({ className }: { className?: string }) {
 function Opening({
   onPick,
   agentic,
+  showHeading,
 }: {
   onPick: (message: string) => void;
   agentic: boolean | null;
+  showHeading: boolean;
 }) {
   const { t } = useLanguage();
+  // Written in the reader's language, because these teach what can be asked —
+  // and an English example teaches the wrong lesson to exactly the person who
+  // needed the translation.
   const suggestions = [
-    "I want to open a tailoring shop. What can I get?",
-    "मैं दलित हूँ और यूपी में रहती हूँ — मुझे कौन सी योजना मिल सकती है?",
-    "What does a ₹1,20,000 loan actually cost me?",
-    "Where do I go to apply in Ballia?",
+    t("chat.try1"), t("chat.try2"), t("chat.try3"), t("chat.try4"),
   ];
 
   return (
     <div className="pb-6">
-      <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
-        <Sparkles className="size-5" />
-      </span>
-      <h2 className="mt-4 font-display text-2xl font-bold sm:text-3xl">
-        {t("chat.title")}
-      </h2>
-      <p className="mt-2 max-w-xl text-muted-foreground">{t("chat.lede")}</p>
+      {showHeading ? (
+        <>
+          <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
+            <Sparkles className="size-5" />
+          </span>
+          <h2 className="mt-4 font-display text-2xl font-bold sm:text-3xl">
+            {t("chat.title")}
+          </h2>
+        </>
+      ) : null}
+      <p className={`${showHeading ? "mt-2" : ""} max-w-xl text-muted-foreground`}>
+        {t("chat.lede")}
+      </p>
 
       {/* Sample questions only make sense when open questions are understood.
           In the guided flow the options below the composer are the way in. */}
@@ -398,12 +494,11 @@ function TraceList({ trace }: { trace: Trace[] }) {
 }
 
 function ModeNote({ agentic }: { agentic: boolean | null }) {
+  const { t } = useLanguage();
   if (agentic === null) return null;
   return (
     <p className="mt-2 px-1 text-[11px] leading-relaxed text-muted-foreground">
-      {agentic
-        ? "Answers come from live lookups over the scheme corpus. Figures are calculated, never written by the model."
-        : "Running the guided flow — no model key is configured, so this asks a fixed set of questions instead of open ones."}
+      {t(agentic ? "chat.mode.agentic" : "chat.mode.guided")}
     </p>
   );
 }

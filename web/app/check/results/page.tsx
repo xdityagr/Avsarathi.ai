@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AlertCircle, ArrowLeft, BadgeCheck, HelpCircle } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button-link";
-import { discover, type DiscoveryMatch } from "@/lib/api";
+import { checkScheme, discover, type DiscoveryMatch, type SchemeVerdict } from "@/lib/api";
+import { getT } from "@/lib/i18n/server";
 import { answersToPayload, queryToAnswers } from "@/lib/facets";
 
 export const metadata = {
@@ -49,6 +50,12 @@ export default async function ResultsPage({
   const params = await searchParams;
   const answers = queryToAnswers(params);
   const payload = answersToPayload(answers);
+  const t = await getT();
+
+  // Arrived from one scheme's page: that scheme's verdict is the answer they
+  // came for, so it goes first, ahead of the hundreds of general matches.
+  const wanted = Array.isArray(params.scheme) ? params.scheme[0] : params.scheme;
+  const focus = wanted ? await checkScheme(wanted, payload) : null;
 
   let result;
   try {
@@ -82,6 +89,8 @@ export default async function ResultsPage({
         <ArrowLeft className="size-4" />
         Change my answers
       </Link>
+
+      {focus ? <FocusVerdict verdict={focus} t={t} /> : null}
 
       <header className="mt-6 border-b border-border pb-8">
         {/* The headline is the targeted count, not the total. A scheme that
@@ -179,6 +188,69 @@ export default async function ResultsPage({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The one scheme they asked about, answered plainly and first.
+ *
+ * Before this, tapping "Check my eligibility" on a scheme page dropped people
+ * into the general wizard and returned six hundred matches — the answer was in
+ * there somewhere, which is not the same as answering.
+ */
+function FocusVerdict({
+  verdict,
+  t,
+}: {
+  verdict: SchemeVerdict;
+  t: (key: never, vars?: Record<string, string | number>) => string;
+}) {
+  const tr = t as unknown as (key: string) => string;
+  const blocked = verdict.verdict === "NOT_MATCHED";
+
+  return (
+    <section
+      className={`mt-6 rounded-xl border p-6 ${
+        blocked ? "border-caution/40 bg-caution-soft" : "border-verified/40 bg-verified-soft"
+      }`}
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {tr("results.focus.title")}
+      </p>
+      <h2 className="mt-2 font-display text-2xl font-bold">
+        <Link href={`/schemes/${verdict.slug}`} className="hover:underline">
+          {verdict.name}
+        </Link>
+      </h2>
+      <p className={`mt-1 font-medium ${blocked ? "text-caution" : "text-verified"}`}>
+        {blocked
+          ? `${tr("results.notMatchedOn")} ${verdict.unmet.join(", ")}`
+          : tr(verdict.verdict === "CHECK" ? "results.strength.check" : "results.strength.likely")}
+      </p>
+
+      <dl className="mt-4 grid gap-1.5 border-t border-border/60 pt-4 text-sm sm:grid-cols-2">
+        {verdict.meets.map((item) => (
+          <div key={item} className="flex items-center gap-2">
+            <BadgeCheck className="size-4 shrink-0 text-verified" />
+            <dt>{item}</dt>
+          </div>
+        ))}
+        {verdict.unmet.map((item) => (
+          <div key={item} className="flex items-center gap-2">
+            <AlertCircle className="size-4 shrink-0 text-caution" />
+            <dt className="font-medium text-caution">{item}</dt>
+          </div>
+        ))}
+        {verdict.unknown.map((item) => (
+          <div key={item} className="flex items-center gap-2">
+            <HelpCircle className="size-4 shrink-0 text-gold-ink" />
+            <dt className="text-muted-foreground">
+              {item} — {tr("results.stillToCheck").toLowerCase()}
+            </dt>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 
