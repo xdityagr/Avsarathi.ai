@@ -654,6 +654,31 @@ async def _render_office_map(cards: list[dict]) -> Optional[dict]:
         return None
 
 
+def _clean_args(args: dict) -> dict:
+    """Repair the shapes a model hands back for an object-typed argument.
+
+    Gemini serialises a nested object as a JSON STRING often enough that it
+    cannot be treated as an exception: `prepare_application` was handed
+    `known` as text, `known.get(...)` raised, the tool failed three times in
+    one turn, and the model quietly fell back to answering from the scheme's
+    prose — a wrong answer with no error anywhere the person could see.
+
+    Parsed rather than rejected, because the content is right and only the
+    envelope is wrong.
+    """
+    cleaned = dict(args)
+    for key, value in list(cleaned.items()):
+        if isinstance(value, str) and value[:1] in "{[":
+            try:
+                cleaned[key] = json.loads(value)
+            except (ValueError, TypeError):
+                pass
+        # A model that has nothing to send sometimes sends the word instead.
+        if cleaned.get(key) in ("null", "None", "{}"):
+            cleaned[key] = None
+    return cleaned
+
+
 TOOL_IMPLEMENTATIONS = {
     "search_schemes": _tool_search_schemes,
     "check_scheme_eligibility": _tool_check_scheme_eligibility,
@@ -995,7 +1020,22 @@ async def stream(
         messages.append(response)
         for call in calls:
             name = call.get("name")
-            args = call.get("args") or {}
+            args = _clean_args(call.get("args") or {})
+            # The person's own details, handed to the tool that fills forms
+            # rather than left to the model to copy across. It has them in the
+            # prompt, but relying on it to retype an eleven-field object into a
+            # function argument is a coin flip, and losing it means a blank form.
+            if name == "prepare_application" and context:
+                merged = {k: v for k, v in context.items()
+                          if k not in ("scheme", "scheme_name") and v}
+                # Whatever the model sent is only merged if it is actually an
+                # object. It has arrived as a JSON string, as a list, and as
+                # the bare word "null"; none of those are worth a crash when
+                # the context already holds everything the form needs.
+                supplied = args.get("known")
+                if isinstance(supplied, dict):
+                    merged.update(supplied)
+                args["known"] = merged
             implementation = TOOL_IMPLEMENTATIONS.get(name)
             if implementation is None:
                 payload, cards, summary = {"error": "unknown tool"}, [], "unknown"
