@@ -23,6 +23,8 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src import application
+from src import handoff
 from src import speech
 from src.agent import (
     is_available as agent_is_available,
@@ -702,3 +704,50 @@ async def transcribe_audio(
         "unclear": result.unclear,
         "provider": result.provider,
     }
+
+
+# ---------------------------------------------------------------------------
+# Filling the form
+# ---------------------------------------------------------------------------
+
+class ApplicationRequest(BaseModel):
+    profile: dict = Field(default_factory=dict)
+    lang: str = "en"
+
+
+@router.post("/application/{slug}")
+async def prepare_application(slug: str, request: ApplicationRequest) -> dict:
+    """The completed application pack for one scheme and one person.
+
+    Nothing is stored. The profile arrives in the request body and leaves in
+    the response — the same promise the wizard makes, and the reason this is a
+    POST rather than a GET with the answers in a shareable URL.
+
+    This does NOT submit anything anywhere. See `src.application` for why that
+    is a decision rather than a limitation.
+    """
+    pack = application.build(slug, request.profile, lang=request.lang)
+    if pack is None:
+        raise HTTPException(status_code=404, detail=f"No scheme with slug '{slug}'")
+    return application.to_dict(pack)
+
+
+# ---------------------------------------------------------------------------
+# Crossing to WhatsApp
+# ---------------------------------------------------------------------------
+
+class HandoffRequest(BaseModel):
+    context: dict = Field(default_factory=dict)
+    history: list[dict] = Field(default_factory=list)
+
+
+@router.post("/handoff")
+async def create_handoff(request: HandoffRequest) -> dict:
+    """Park this conversation and return the code that resumes it on WhatsApp.
+
+    WhatsApp's deep link carries text and nothing else — no parameters, no
+    session — so the code travels inside the prefilled message and is redeemed
+    by the first thing the person sends.
+    """
+    code = handoff.create(request.context, request.history)
+    return {"code": code, "expires_in": handoff.TTL_SECONDS}

@@ -28,6 +28,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, AsyncIterator, Optional
 
+from src import application
 from src.calculator import calculate_emi
 from src.catalog import catalog_meta, get_scheme, search_schemes
 from src.config import SCHEMES, get_settings
@@ -119,6 +120,19 @@ WHICH TOOL
 - Money, interest, instalments, repayment -> `price_loan`.
 - "Where do I go?" -> `find_offices`.
 - "How many...", "what categories are there" -> `corpus_stats`.
+- "How do I apply?", "what papers do I need?", "help me fill this" ->
+  `prepare_application`, with everything you already know about them.
+
+APPLYING
+You can fill a form in. You cannot submit one, and you must never suggest
+otherwise — not "I have applied for you", not "your application is sent", not
+"I will submit this". Say what is filled, what they still have to write, what
+to carry, and where to take it.
+
+That restraint is the product working, not failing. Every agent who charges a
+poor household a fee for a free government scheme offers to "handle it all",
+and a person who believes an application was submitted when it was not will
+stop chasing it and miss the window entirely.
 
 Chain them. Searching, then reading the scheme, then checking eligibility
 against it is a normal and good sequence — do it rather than guessing a step.
@@ -568,6 +582,37 @@ def _tool_corpus_stats(
     return payload, [], f"{page.total} schemes"
 
 
+def _tool_prepare_application(
+    slug: str,
+    known: Optional[dict] = None,
+) -> tuple[dict, list[dict], str]:
+    """Fill in this scheme's application from what the person has told us.
+
+    Returns the fields we could complete, the ones they must write themselves,
+    the documents to carry and the steps in order. It submits NOTHING — see
+    `src.application` for why that is a decision rather than a gap.
+    """
+    pack = application.build(slug, known or {})
+    if pack is None:
+        return {"error": f"No scheme with slug '{slug}'"}, [], "no such scheme"
+
+    payload = application.to_dict(pack)
+    card = {
+        "kind": "application",
+        "slug": payload["slug"],
+        "name": payload["name"],
+        "mode": payload["mode"],
+        "filled": payload["filled"],
+        "total": payload["total"],
+        "blanks": [f["label"] for f in payload["fields"] if f["blank"]],
+        "documents": [d["text"] for d in payload["documents"]],
+        "steps": payload["steps"][:8],
+        "official_url": payload["official_url"],
+    }
+    summary = f"{payload['filled']} of {payload['total']} fields filled"
+    return payload, [card], summary
+
+
 TOOL_IMPLEMENTATIONS = {
     "search_schemes": _tool_search_schemes,
     "check_scheme_eligibility": _tool_check_scheme_eligibility,
@@ -576,6 +621,7 @@ TOOL_IMPLEMENTATIONS = {
     "price_loan": _tool_price_loan,
     "find_offices": _tool_find_offices,
     "lookup_scheme": _tool_lookup_scheme,
+    "prepare_application": _tool_prepare_application,
 }
 
 TOOL_LABELS = {
@@ -586,6 +632,7 @@ TOOL_LABELS = {
     "price_loan": "Calculated the repayment",
     "find_offices": "Looked up offices that can disburse",
     "lookup_scheme": "Read the scheme's published text",
+    "prepare_application": "Filled in the application form",
 }
 
 # Declared for the model. Descriptions matter more than names here — they are
@@ -713,6 +760,36 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                 "longitude": {"type": "number"},
             },
             "required": ["state"],
+        },
+    },
+    {
+        "name": "prepare_application",
+        "description": (
+            "Fill in a scheme's application form for this person. Give the "
+            "scheme's slug and everything you already know about them, and it "
+            "returns the fields it could complete, the ones they must write "
+            "themselves, the documents to carry and the steps in order. "
+            "Use when someone asks how to apply, what to bring, or to help "
+            "them fill the form. It does NOT submit the application anywhere "
+            "and you must never say that it did — say what is filled, what is "
+            "left, and where to take it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "slug": {"type": "string"},
+                "known": {
+                    "type": "object",
+                    "description": (
+                        "What the person has told you: full_name, parent_name, "
+                        "dob, gender, category, address, state, district, "
+                        "pincode, mobile, income, purpose, project_cost, "
+                        "bank_name, institution, course, year. Omit anything "
+                        "they have not said; never invent a value."
+                    ),
+                },
+            },
+            "required": ["slug"],
         },
     },
     {
