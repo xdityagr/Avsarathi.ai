@@ -15,7 +15,6 @@ import {
   Calculator,
   FileText,
   Info,
-  Loader2,
   BadgeCheck,
   BarChart3,
   CircleHelp,
@@ -30,8 +29,26 @@ import { useLanguage } from "@/components/language-provider";
 import { readPlaceCookie } from "@/lib/i18n/config";
 import { Markdown } from "@/components/markdown";
 import { VoiceButton } from "@/components/voice-button";
+import { WhatsAppDoor } from "@/components/whatsapp-door";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/**
+ * The assistant, as a mark.
+ *
+ * Turns while it is working and is still otherwise. It is the only animated
+ * thing on the site, which is what makes it read as "thinking" rather than as
+ * decoration — if everything moved, this would mean nothing.
+ */
+function Orb({ busy = false, className }: { busy?: boolean; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      data-busy={busy}
+      className={cn("avs-orb block shrink-0", className ?? "size-7")}
+    />
+  );
+}
 
 interface Chip {
   value: string;
@@ -69,10 +86,25 @@ const TOOL_ICONS: Record<string, typeof Search> = {
 export function ChatPanel({
   className,
   showHeading = true,
+  scheme,
 }: {
   className?: string;
-  /** False on the assistant page, where the rail already carries the title. */
-  showHeading?: boolean;
+  /**
+   * The scheme this conversation was opened from, when it was opened from one.
+   *
+   * Someone who has just read a scheme page and clicks "ask about this" is
+   * asking about THAT scheme, and having to name it again — in an official
+   * fifteen-word title they may not be able to type — is the point at which
+   * they give up. It travels as context so "am I eligible?" resolves.
+   */
+  scheme?: { slug: string; name: string };
+  /**
+   * `true` in the slide-over, where nothing else names the assistant.
+   * `"mobile"` on the assistant page, where the rail names it on a wide screen
+   * and disappears below `lg` — so the heading has to take over at exactly
+   * that width, or the page opens with an unattributed paragraph.
+   */
+  showHeading?: boolean | "mobile";
 }) {
   const { lang, t } = useLanguage();
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -159,7 +191,10 @@ export function ChatPanel({
         body: JSON.stringify({
           message,
           history,
-          context: knownState ? { state: knownState } : {},
+          context: {
+            ...(knownState ? { state: knownState } : {}),
+            ...(scheme ? { scheme: scheme.slug, scheme_name: scheme.name } : {}),
+          },
           language: lang,
         }),
         });
@@ -222,7 +257,7 @@ export function ChatPanel({
         setLive([]);
       }
     },
-    [turns, startScripted, lang, knownState],
+    [turns, startScripted, lang, knownState, scheme],
   );
 
   /* ------------------------------------------------------------------ mode */
@@ -265,7 +300,15 @@ export function ChatPanel({
   return (
     <div className={cn("flex min-h-0 flex-col", className)}>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6">
+        <div
+          className={cn(
+            "mx-auto w-full max-w-3xl px-5 py-8 sm:px-6 sm:py-10",
+            // Only while there is nothing to read. The moment an answer
+            // arrives, the column has to behave like a transcript again and
+            // start at the top.
+            empty && "flex min-h-full flex-col justify-center",
+          )}
+        >
           {empty || turns.length <= 2 ? (
             <Opening onPick={send} agentic={agentic} showHeading={showHeading} />
           ) : null}
@@ -274,7 +317,7 @@ export function ChatPanel({
             {turns.map((turn, index) =>
               turn.from === "user" ? (
                 <div key={index} className="flex justify-end">
-                  <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-[0.95rem] leading-relaxed text-primary-foreground">
+                  <p className="max-w-[85%] whitespace-pre-wrap rounded-[1.125rem] rounded-ee-md bg-primary px-4 py-3 text-[0.9375rem] leading-relaxed text-primary-foreground">
                     {turn.text}
                   </p>
                 </div>
@@ -283,9 +326,7 @@ export function ChatPanel({
                   {turn.trace?.length ? <TraceList trace={turn.trace} /> : null}
                   {turn.text ? (
                     <div className="flex gap-3">
-                      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                        <Sparkles className="size-3.5" />
-                      </span>
+                      <Orb className="mt-1 size-7" />
                       {/* The model writes light Markdown — **bold** for a scheme
                           name, short lists for steps. Rendered, not shown raw. */}
                       <Markdown className="min-w-0 flex-1">{turn.text}</Markdown>
@@ -306,17 +347,24 @@ export function ChatPanel({
           {busy ? (
             <div className="mt-6 space-y-3">
               {live.length ? <TraceList trace={live} /> : null}
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                  <Loader2 className="size-3.5 animate-spin text-primary" />
-                </span>
-                {t("chat.thinking")}
+              {/* The shimmer stands where the answer will appear, at the width
+                  of a line of it, so the wait is shaped like the thing being
+                  waited for rather than like a spinner in empty space. */}
+              <div className="flex gap-3">
+                <Orb busy className="mt-1 size-7" />
+                <div className="min-w-0 flex-1 space-y-2 pt-1">
+                  <p className="text-[0.9375rem] text-muted-foreground">
+                    {t("chat.thinking")}
+                  </p>
+                  <span className="avs-shimmer block h-2 w-full max-w-sm rounded-full" />
+                  <span className="avs-shimmer block h-2 w-2/3 max-w-xs rounded-full" />
+                </div>
               </div>
             </div>
           ) : null}
 
           {failed ? (
-            <div className="mt-6 rounded-xl border border-caution/30 bg-caution-soft p-4 text-sm text-caution">
+            <div className="mt-6 border-s-2 border-clay ps-4 text-[0.9375rem] leading-relaxed text-clay">
               {t("chat.failed")}
             </div>
           ) : null}
@@ -336,7 +384,7 @@ export function ChatPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => send(chip.value)}
-                  className="rounded-full border border-border bg-card px-3.5 py-2 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-accent disabled:opacity-50"
+                  className="rounded-full border border-border bg-card px-4 py-2 text-[0.875rem] transition-colors hover:border-leaf/40 hover:bg-accent disabled:opacity-50"
                 >
                   {chip.label}
                 </button>
@@ -344,12 +392,30 @@ export function ChatPanel({
             </div>
           ) : null}
 
+          {/*
+            What the assistant is looking at, stated rather than implied. The
+            scheme travels invisibly in the context, and an invisible
+            attachment is one the person cannot tell is missing when it is —
+            so it is shown, and it links back to the page they came from.
+          */}
+          {scheme ? (
+            <Link
+              href={`/schemes/${scheme.slug}`}
+              className="mb-2 flex w-fit max-w-full items-center gap-2 rounded-full border border-border
+                         bg-secondary/60 px-3 py-1.5 text-xs text-muted-foreground
+                         transition-colors hover:border-leaf/40 hover:text-foreground"
+            >
+              <FileText className="size-3.5 shrink-0 text-leaf" />
+              <span className="line-clamp-1">{scheme.name}</span>
+            </Link>
+          ) : null}
+
           <form
             onSubmit={(event) => {
               event.preventDefault();
               send(draft);
             }}
-            className="flex items-end gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm focus-within:border-primary/50"
+            className="flex items-end gap-1 rounded-[1.5rem] border border-border bg-card p-2 shadow-[0_1px_2px_rgb(28_26_23/0.04),0_10px_30px_-22px_rgb(28_26_23/0.4)] transition-colors focus-within:border-leaf/50"
           >
             <textarea
               ref={boxRef}
@@ -373,7 +439,7 @@ export function ChatPanel({
                   send(draft);
                 }
               }}
-              className="max-h-40 min-h-[2.75rem] flex-1 resize-none bg-transparent px-2.5 py-2.5 text-base outline-none placeholder:text-muted-foreground disabled:opacity-60"
+              className="max-h-40 min-h-[2.75rem] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-base leading-relaxed outline-none [scrollbar-width:none] placeholder:text-faint disabled:opacity-60 [&::-webkit-scrollbar]:hidden"
             />
             <VoiceButton
               disabled={busy}
@@ -384,7 +450,7 @@ export function ChatPanel({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-10 shrink-0"
+              className="size-10 shrink-0 rounded-full text-muted-foreground"
               onClick={restart}
               disabled={busy || empty}
               aria-label={t("chat.restart")}
@@ -394,7 +460,7 @@ export function ChatPanel({
             <Button
               type="submit"
               size="icon"
-              className="size-10 shrink-0 rounded-xl"
+              className="size-10 shrink-0 rounded-full"
               disabled={busy || !draft.trim()}
               aria-label={t("chat.send")}
             >
@@ -402,7 +468,7 @@ export function ChatPanel({
             </Button>
           </form>
 
-          <ModeNote agentic={agentic} />
+          <ModeNote agentic={agentic} hideWide={showHeading === "mobile"} />
         </div>
       </div>
     </div>
@@ -417,7 +483,7 @@ function Opening({
 }: {
   onPick: (message: string) => void;
   agentic: boolean | null;
-  showHeading: boolean;
+  showHeading: boolean | "mobile";
 }) {
   const { t } = useLanguage();
   // Written in the reader's language, because these teach what can be asked —
@@ -428,36 +494,52 @@ function Opening({
   ];
 
   return (
-    <div className="pb-6">
+    <div className="flex flex-col items-center pb-8 text-center">
       {showHeading ? (
-        <>
-          <span className="flex size-11 items-center justify-center rounded-xl bg-secondary text-primary">
-            <Sparkles className="size-5" />
-          </span>
-          <h2 className="mt-4 font-display text-2xl font-bold sm:text-3xl">
+        <div
+          className={cn(
+            "flex flex-col items-center",
+            showHeading === "mobile" && "lg:hidden",
+          )}
+        >
+          <Orb className="size-12" />
+          <h2 className="mt-4 text-[1.625rem] sm:text-[1.875rem]">
             {t("chat.title")}
           </h2>
-        </>
+        </div>
       ) : null}
-      <p className={`${showHeading ? "mt-2" : ""} max-w-xl text-muted-foreground`}>
+      <p
+        className={cn(
+          "max-w-[54ch] text-[0.9375rem] leading-relaxed text-muted-foreground sm:text-[1rem]",
+          showHeading === "mobile" && "mt-4 lg:mt-0",
+          showHeading === true && "mt-4",
+        )}
+      >
         {t("chat.lede")}
       </p>
 
       {/* Sample questions only make sense when open questions are understood.
           In the guided flow the options below the composer are the way in. */}
-      <div
-        className={agentic ? "mt-6 grid gap-2 sm:grid-cols-2" : "hidden"}
-      >
-        {suggestions.map((suggestion) => (
-          <button
-            key={suggestion}
-            type="button"
-            onClick={() => onPick(suggestion)}
-            className="rounded-xl border border-border bg-card p-3.5 text-left text-sm leading-relaxed transition-colors hover:border-primary/40 hover:bg-accent"
-          >
-            {suggestion}
-          </button>
-        ))}
+      <div className={agentic ? "mt-9 w-full max-w-xl" : "hidden"}>
+        <p className="meta">{t("chat.try.label")}</p>
+        <div className="mt-4 flex flex-col gap-2">
+          {suggestions.map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
+              onClick={() => onPick(suggestion)}
+              className="group flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-3.5 text-start text-[0.9375rem] leading-relaxed transition-colors hover:border-leaf/40 hover:bg-accent"
+            >
+              <span>{suggestion}</span>
+              <ArrowUp className="size-4 shrink-0 rotate-45 text-faint transition-colors group-hover:text-leaf" />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-col items-center gap-2 lg:hidden">
+        <span className="meta">{t("chat.orWhatsApp")}</span>
+        <WhatsAppDoor size="pill" />
       </div>
     </div>
   );
@@ -481,10 +563,10 @@ function TraceList({ trace }: { trace: Trace[] }) {
             key={index}
             className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
-              <Icon className="size-3.5" />
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border bg-card">
+              <Icon className="size-3" />
             </span>
-            <span className="font-medium text-foreground">{step.label}</span>
+            <span className="text-foreground">{step.label}</span>
             {step.summary ? <span>· {step.summary}</span> : null}
           </li>
         );
@@ -493,11 +575,24 @@ function TraceList({ trace }: { trace: Trace[] }) {
   );
 }
 
-function ModeNote({ agentic }: { agentic: boolean | null }) {
+function ModeNote({
+  agentic,
+  hideWide,
+}: {
+  agentic: boolean | null;
+  hideWide?: boolean;
+}) {
   const { t } = useLanguage();
   if (agentic === null) return null;
   return (
-    <p className="mt-2 px-1 text-[11px] leading-relaxed text-muted-foreground">
+    <p
+      className={cn(
+        "mt-2.5 px-1 text-[0.75rem] leading-relaxed text-faint",
+        // The rail prints this on a wide screen; two copies of the same
+        // sentence on one screen reads as a bug.
+        hideWide && "lg:hidden",
+      )}
+    >
       {t(agentic ? "chat.mode.agentic" : "chat.mode.guided")}
     </p>
   );
@@ -531,7 +626,7 @@ function CardView({
       return (
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <span className="font-display text-2xl font-bold text-primary tabular-nums">
+            <span className="font-display text-[1.5rem] font-normal text-primary tabular-nums">
               {(card.targeted as number)?.toLocaleString("en-IN")}
             </span>
             <span className="text-sm text-muted-foreground">
@@ -606,12 +701,12 @@ function CardView({
         <div
           className={cn(
             "rounded-xl border bg-card p-4",
-            blocked ? "border-caution/40" : "border-verified/40",
+            blocked ? "border-clay/30" : "border-verified/40",
           )}
         >
           <div className="flex items-start gap-2.5">
             {blocked ? (
-              <XCircle className="mt-0.5 size-4 shrink-0 text-caution" />
+              <XCircle className="mt-0.5 size-4 shrink-0 text-clay" />
             ) : (
               <BadgeCheck className="mt-0.5 size-4 shrink-0 text-verified" />
             )}
@@ -625,7 +720,7 @@ function CardView({
               <p
                 className={cn(
                   "mt-0.5 text-sm font-medium",
-                  blocked ? "text-caution" : "text-verified",
+                  blocked ? "text-clay" : "text-verified",
                 )}
               >
                 {blocked
@@ -646,8 +741,8 @@ function CardView({
             ))}
             {unmet.map((item) => (
               <div key={item} className="flex items-center gap-2">
-                <XCircle className="size-3.5 shrink-0 text-caution" />
-                <dt className="font-medium text-caution">{item}</dt>
+                <XCircle className="size-3.5 shrink-0 text-clay" />
+                <dt className="font-medium text-clay">{item}</dt>
               </div>
             ))}
             {unknown.map((item) => (
@@ -719,11 +814,11 @@ function CardView({
 
     case "compare":
       return (
-        <div className="rounded-xl border border-caution/30 bg-caution-soft p-4">
-          <p className="text-sm font-semibold text-caution">
+        <div className="rounded-xl border border-clay/25 bg-clay-soft p-4">
+          <p className="text-sm font-semibold text-clay">
             {s("alt_label")} → {s("alt_amount")}
           </p>
-          <p className="mt-1 text-sm text-caution/90">
+          <p className="mt-1 text-sm text-clay/90">
             {s("scheme_label")} → {s("scheme_amount")} on the same {s("loan")}. You
             keep {s("saving")}.
           </p>
@@ -816,7 +911,7 @@ function CardView({
           className={cn(
             "flex gap-2.5 rounded-xl border p-4 text-sm leading-relaxed",
             warn
-              ? "border-caution/30 bg-caution-soft text-caution"
+              ? "border-clay/25 bg-clay-soft text-clay"
               : "border-border bg-muted/40 text-muted-foreground",
           )}
         >

@@ -1,6 +1,7 @@
 import { CheckForm } from "@/components/check-form";
+import { PageHeader } from "@/components/page-header";
 import { getCatalogMeta, getScheme } from "@/lib/api";
-import { getPlace, getT } from "@/lib/i18n/server";
+import { getLang, getPlace, getT } from "@/lib/i18n/server";
 
 export const metadata = {
   title: "Check what you qualify for",
@@ -16,35 +17,33 @@ export default async function CheckPage({
 }) {
   const params = await searchParams;
   const wanted = Array.isArray(params.scheme) ? params.scheme[0] : params.scheme;
+  // The language is read first because it decides what the scheme lookup
+  // returns, not just how it is labelled — without it the page headline named
+  // the scheme in English while the page they arrived from named it in Hindi,
+  // which reads as two different schemes.
+  const lang = await getLang();
   const [meta, t, place, focus] = await Promise.all([
     getCatalogMeta(), getT(), getPlace(),
-    wanted ? getScheme(wanted) : Promise.resolve(null),
+    wanted ? getScheme(wanted, lang) : Promise.resolve(null),
   ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-      <header className="max-w-3xl">
-        {/* Arriving from one scheme's page is a different question from
-            "what am I entitled to" — it is "do I qualify for THIS", and the
-            page should say so rather than silently widening the ask. */}
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">
-          {focus ? t("check.h1.scheme") : t("check.h1")}
-        </h1>
-        {focus ? (
-          <p className="mt-3 text-lg font-medium text-primary">
-            {focus.name.trim()}
-          </p>
-        ) : null}
-        <p className="mt-3 text-lg text-muted-foreground">
-          {focus ? t("check.lede.scheme") : t("check.lede")}
-        </p>
-      </header>
+    <div className="pb-24">
+      {/* Arriving from one scheme's page is a different question from
+          "what am I entitled to" — it is "do I qualify for THIS", and the
+          page should say so rather than silently widening the ask. */}
+      <PageHeader
+        eyebrow={focus ? focus.name.trim() : t("nav.check")}
+        title={focus ? t("check.h1.scheme") : t("check.h1")}
+        lede={focus ? t("check.lede.scheme") : t("check.lede")}
+      />
 
       <CheckForm
         meta={meta}
         initialState={place}
         focusSlug={focus?.slug ?? null}
-        className="mt-10"
+        focusName={focus?.name.trim() ?? null}
+        className="mx-auto max-w-6xl px-5 sm:px-6"
       />
     </div>
   );

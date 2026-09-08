@@ -23,12 +23,14 @@ import {
   answersToQuery,
   answersToPayload,
 } from "@/lib/facets";
+import { categoryLabel } from "@/lib/i18n/vocabulary";
 import { cn } from "@/lib/utils";
 
 export function CheckForm({
   meta,
   initialState,
   focusSlug,
+  focusName,
   className,
 }: {
   meta: CatalogMeta;
@@ -36,9 +38,11 @@ export function CheckForm({
   initialState?: string | null;
   /** Set when the person came from one scheme's page to check that scheme. */
   focusSlug?: string | null;
+  /** That scheme's name, so the panel can show what is being checked. */
+  focusName?: string | null;
   className?: string;
 }) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const router = useRouter();
   const [answers, setAnswers] = useState<Answers>(
     initialState ? { state: initialState } : {},
@@ -140,7 +144,7 @@ export function CheckForm({
                       : "border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent",
                   )}
                 >
-                  {category.name}
+                  {categoryLabel(lang, category.name)}
                 </button>
               );
             })}
@@ -197,7 +201,7 @@ export function CheckForm({
                   id="age"
                   inputMode="numeric"
                   placeholder="e.g. 34"
-                  className="mt-1.5 h-11 bg-card text-base"
+                  className="mt-2 h-12 rounded-xl bg-card text-base"
                   value={answers.age ?? ""}
                   onChange={(event) => {
                     const value = event.target.value.replace(/\D/g, "");
@@ -218,7 +222,7 @@ export function CheckForm({
                   id="income"
                   inputMode="numeric"
                   placeholder="e.g. 180000"
-                  className="mt-1.5 h-11 bg-card text-base"
+                  className="mt-2 h-12 rounded-xl bg-card text-base"
                   value={answers.family_income ?? ""}
                   onChange={(event) => {
                     const value = event.target.value.replace(/[^\d]/g, "");
@@ -280,7 +284,7 @@ export function CheckForm({
               </Label>
               <select
                 id="occupation"
-                className="mt-1.5 h-11 w-full rounded-lg border border-input bg-card px-3 text-base"
+                className="mt-2 h-12 w-full rounded-xl border border-input bg-card px-3.5 text-base"
                 value={answers.occupation ?? ""}
                 onChange={(event) => {
                   const value = event.target.value;
@@ -311,32 +315,59 @@ export function CheckForm({
       <aside className="hidden lg:block">
         <div className="sticky top-24 space-y-4">
           <div className="card-quiet p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {t("check.matching")}
-            </p>
-            <p className="mt-2 font-display text-4xl font-bold tabular-nums text-primary">
-              {counting && matched === null ? (
-                <Loader2 className="size-8 animate-spin" />
-              ) : (
-                (matched ?? meta.total).toLocaleString("en-IN")
-              )}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {answered === 0
-                ? t("check.matching.none")
-                : `schemes, from ${answered} ${answered === 1 ? "answer" : "answers"}`}
-            </p>
+            {focusName ? (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("check.focus.label")}
+                </p>
+                <p className="mt-2 font-display text-lg font-semibold leading-snug text-foreground">
+                  {focusName}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  {t("check.focus.also")}
+                  {matched !== null ? (
+                    <>
+                      {" — "}
+                      <span className="tabular-nums text-foreground">
+                        {matched.toLocaleString(`${lang}-IN`)}
+                      </span>
+                    </>
+                  ) : null}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                  {t("check.matching")}
+                </p>
+                <p className="mt-2 font-display text-[2.5rem] font-light tabular-nums text-primary">
+                  {counting && matched === null ? (
+                    <Loader2 className="size-8 animate-spin" />
+                  ) : (
+                    (matched ?? meta.total).toLocaleString(`${lang}-IN`)
+                  )}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {answered === 0
+                    ? t("check.matching.none")
+                    : t("check.matching.from")}
+                </p>
 
-            {targeted > 0 ? (
-              <p className="mt-3 rounded-lg bg-gold-soft px-3 py-2 text-sm font-medium text-gold-ink">
-                {t("check.matching.targeted", { count: targeted.toLocaleString("en-IN") })}
-              </p>
-            ) : null}
+                {targeted > 0 ? (
+                  <p className="mt-3 rounded-lg bg-gold-soft px-3 py-2 text-sm font-medium text-gold-ink">
+                    {t("check.matching.targeted", {
+                      count: targeted.toLocaleString(`${lang}-IN`),
+                    })}
+                  </p>
+                ) : null}
+              </>
+            )}
 
             <SubmitButton
               className="mt-5 w-full"
               navigating={navigating}
               onClick={submit}
+              label={focusName ? t("check.focus.submit") : undefined}
             />
           </div>
 
@@ -353,17 +384,20 @@ function SubmitButton({
   navigating,
   onClick,
   className,
+  label,
 }: {
   navigating: boolean;
   onClick: () => void;
   className?: string;
+  /** Overrides "Show my schemes" when one scheme is being checked. */
+  label?: string;
 }) {
   const { t } = useLanguage();
   return (
     <Button
       type="submit"
       size="lg"
-      className={cn("h-12 px-6 text-base", className)}
+      className={cn("h-12 rounded-full px-7 text-base", className)}
       onClick={onClick}
       disabled={navigating}
     >
@@ -374,7 +408,7 @@ function SubmitButton({
         </>
       ) : (
         <>
-          {t("check.submit")}
+          {label ?? t("check.submit")}
           <ArrowRight className="size-4" />
         </>
       )}
@@ -400,7 +434,7 @@ function Section({
           {step}
         </span>
         <div>
-          <h2 className="font-display text-xl font-bold">{title}</h2>
+          <h2 className="font-display text-[1.25rem] font-normal">{title}</h2>
           {hint ? (
             <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
           ) : null}
@@ -508,7 +542,7 @@ function LocationPicker({
         <Button
           type="button"
           variant="outline"
-          className="h-11 justify-start bg-card px-4"
+          className="h-12 justify-start rounded-xl bg-card px-4"
           onClick={useMyLocation}
           disabled={busy}
         >
@@ -525,7 +559,7 @@ function LocationPicker({
             inputMode="numeric"
             maxLength={6}
             placeholder={t("check.location.pin")}
-            className="h-11 w-40 bg-card text-base"
+            className="h-12 w-40 rounded-xl bg-card text-base"
             value={pin}
             aria-label={t("check.location.pin")}
             onChange={(event) => {
@@ -550,7 +584,7 @@ function LocationPicker({
         </Label>
         <select
           id="state"
-          className="mt-1.5 h-11 w-full rounded-lg border border-input bg-card px-3 text-base"
+          className="mt-2 h-12 w-full rounded-xl border border-input bg-card px-3.5 text-base"
           value={state ?? ""}
           onChange={(event) => {
             const next = event.target.value || undefined;
