@@ -18,10 +18,16 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import re
+import time
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse, HTMLResponse
 
 from src.config import get_settings
 from src.database import init_database
+from src.api import router as api_router
 from src.webhook import router as webhook_router, set_message_queue
 from src.worker import MessageWorker
 
@@ -94,6 +100,7 @@ app = FastAPI(
 
 # Mount routes
 app.include_router(webhook_router)
+app.include_router(api_router)
 
 
 @app.get("/health")
@@ -106,13 +113,105 @@ async def health_check():
     }
 
 
-@app.get("/")
-async def root():
-    """Root endpoint — basic info."""
+ASSET_NAME_RE = re.compile(r"^[a-z0-9_-]+\.(css|js)$")
+ASSET_TYPES = {".css": "text/css", ".js": "text/javascript"}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def landing():
+    """Landing page.
+
+    Served from this same app rather than a separate frontend build: one process,
+    one deploy, no Node toolchain, and nothing extra to go wrong on demo day.
+    (The partner console proper is planned as a separate Next.js app.) No
+    webfonts either — the site has to work offline, for the same reason map tiles
+    are cached locally.
+    """
+    return FileResponse(WEB_DIR / "landing.html", media_type="text/html")
+
+
+@app.get("/app", response_class=HTMLResponse)
+async def portal():
+    """The scheme finder itself."""
+    return FileResponse(WEB_DIR / "app.html", media_type="text/html")
+
+
+@app.get("/assets/{filename}")
+async def get_asset(filename: str):
+    """Serve the shared stylesheet and custom-element definitions.
+
+    A named allowlist pattern rather than a StaticFiles mount — same reasoning as
+    /media below: one narrow route is easier to reason about than a directory
+    served wholesale.
+    """
+    if not ASSET_NAME_RE.match(filename):
+        raise HTTPException(status_code=404, detail="Not found")
+    path = (WEB_DIR / filename).resolve()
+    if not path.is_file() or WEB_DIR.resolve() not in path.parents:
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(path, media_type=ASSET_TYPES[path.suffix])
+
+
+@app.get("/api-info")
+async def api_info():
+    """What this service is, for anything that pings the old root route."""
     return {
         "name": "Avsarathi.ai",
-        "description": "NSFDC Scheme Matching Platform — SIH26092",
-        "phase": "0 — Webhook/Queue/Worker skeleton",
+        "description": "AI-Driven Scheme Matching for NSFDC Credit Schemes — SIH26092",
+        "landing": "/",
+        "portal": "/app",
         "health": "/health",
         "webhook": "/webhook/whatsapp",
+        "api": ["/api/recommend", "/api/schemes", "/api/partners"],
     }
+
+
+# ---------------------------------------------------------------------------
+# Rendered partner maps
+#
+# Twilio fetches media_url from the public internet, so a map has to be served on
+# a URL with no auth in front of it. That map encodes a beneficiary's approximate
+# location, which is personal data under DPDP — so this is ONE narrow route with
+# a strict filename pattern, not a StaticFiles mount over a directory. Filenames
+# are unguessable tokens and old files are swept.
+# ---------------------------------------------------------------------------
+
+WEB_DIR = Path(__file__).resolve().parent / "web"
+MEDIA_DIR = Path("data/maps")
+MEDIA_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{22}\.png$")
+MEDIA_TTL_SECONDS = 3600
+
+
+def _sweep_media(ttl_seconds: int = MEDIA_TTL_SECONDS) -> int:
+    """Delete rendered maps older than the TTL. Twilio caches what it fetches."""
+    if not MEDIA_DIR.exists():
+        return 0
+    cutoff = time.time() - ttl_seconds
+    removed = 0
+    for path in MEDIA_DIR.glob("*.png"):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+                removed += 1
+        except OSError:
+            pass
+    return removed
+
+
+@app.get("/media/{filename}")
+async def get_media(filename: str):
+    """Serve a rendered map. Rejects anything not matching the token pattern."""
+    if not MEDIA_NAME_RE.match(filename):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    path = MEDIA_DIR / filename
+    # Resolve and confirm containment — belt and braces against traversal.
+    try:
+        resolved = path.resolve()
+        if not resolved.is_file() or MEDIA_DIR.resolve() not in resolved.parents:
+            raise HTTPException(status_code=404, detail="Not found")
+    except OSError:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    _sweep_media()
+    return FileResponse(resolved, media_type="image/png")

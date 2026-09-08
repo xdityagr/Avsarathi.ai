@@ -29,6 +29,75 @@ uvicorn src.main:app --reload --port 8000
 pytest
 ```
 
+## Run the web portal locally
+
+```bash
+pip install -e ".[dev]"
+uvicorn src.main:app --reload --port 8000
+# open http://localhost:8000
+```
+
+Three tabs:
+- **Find a scheme** — the beneficiary flow: eligibility, why you don't qualify for
+  the rest, what the loan really costs against a moneylender, and which partner
+  can actually disburse.
+- **Channel partners** — every agency with the figure each prudential rule is
+  assessed against, and whether that figure is published or representative.
+- **Scheme corpus** — all five NSFDC schemes with their provenance.
+
+No API keys needed for the portal — the whole path is deterministic, with no LLM
+call. WhatsApp needs Twilio credentials in `.env`; the portal does not.
+
+## Connect WhatsApp (Twilio Sandbox)
+
+The Sandbox is free and needs no WhatsApp Business Account. A trial account
+includes **$15 credit and 100 free WhatsApp messages**, and expires after 30
+days — plenty for a demo, but create it close to the event, not months before.
+
+**1. Twilio account** — sign up, then Console → Messaging → Try it out →
+*Send a WhatsApp message*. You get a shared sandbox number (`+14155238886`) and
+a join code.
+
+**2. Every tester opts in.** Each phone that will talk to the bot sends
+`join <your-code>` to `+14155238886` on WhatsApp. Without this the sandbox will
+not deliver to that number — so do it for every phone that touches the demo,
+including the one you hand a judge.
+
+**3. Expose the local server.** Twilio must reach your webhook over HTTPS:
+
+```bash
+cloudflared tunnel --url http://localhost:8000     # or: ngrok http 8000
+```
+
+**4. Point the sandbox at it.** In the sandbox settings, set
+*When a message comes in* to `https://<your-tunnel>/webhook/whatsapp`, method
+**POST**.
+
+**5. Configure `.env`:**
+
+```
+TWILIO_ACCOUNT_SID=ACxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxx
+TWILIO_WHATSAPP_NUMBER=whatsapp:+14155238886
+WEBHOOK_BASE_URL=https://<your-tunnel>       # must match exactly, or signature checks fail
+WEBHOOK_VERIFY_SIGNATURES=true
+```
+
+`WEBHOOK_BASE_URL` is used to reconstruct the signed URL. If it doesn't match
+what Twilio called, every request 403s — that is the single most common setup
+failure here.
+
+**6. Restart and message the sandbox** from an opted-in phone. Send anything,
+then `START`, then answer the five questions.
+
+### Sandbox limits worth knowing before demo day
+
+- The number is **shared** — the join code is what routes messages to you.
+- Opt-in **expires after 72 hours of inactivity**; re-send the join code on the day.
+- Outside a 24-hour window from the user's last message you can only send
+  pre-approved templates. Our flow is always reactive, so this doesn't bite.
+- Trial accounts prepend a "Sent from your Twilio trial account" line.
+
 ## Architecture
 
 Three-tier recommendation pipeline:

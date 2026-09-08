@@ -310,3 +310,91 @@ class TestFinancialInvariants:
         assert result.moratorium_monthly_payment == round(result.moratorium_monthly_payment, 2)
         assert result.total_payable == round(result.total_payable, 2)
         assert result.total_interest == round(result.total_interest, 2)
+
+
+# ---------------------------------------------------------------------------
+# Instalment frequency — NSFDC repays QUARTERLY, not monthly
+# ---------------------------------------------------------------------------
+
+class TestInstalmentFrequency:
+    """The calculator defaulted to monthly EMIs, but every NSFDC scheme repays
+    quarterly (Udyam Nidhi quarterly or half-yearly). A monthly figure is not a
+    number the borrower is ever actually asked to pay.
+
+    periods_per_year defaults to 12 specifically so every test above this line
+    keeps passing byte-identically.
+    """
+
+    def test_default_is_monthly_and_unchanged(self):
+        """Passing periods_per_year=12 explicitly must equal the old behaviour."""
+        implicit = calculate_emi(
+            project_cost=140_000, financing_pct=0.90, rate_annual=6.5,
+            tenure_months=84, moratorium_months=6,
+        )
+        explicit = calculate_emi(
+            project_cost=140_000, financing_pct=0.90, rate_annual=6.5,
+            tenure_months=84, moratorium_months=6, periods_per_year=12,
+        )
+        assert implicit == explicit
+        assert implicit.instalment_frequency == "monthly"
+
+    def test_quarterly_instalment_count(self):
+        """84-month tenure, 6-month moratorium -> 78 months -> 26 quarters."""
+        result = calculate_emi(
+            project_cost=500_000, financing_pct=0.90, rate_annual=8.0,
+            tenure_months=84, moratorium_months=6, periods_per_year=4,
+        )
+        assert result.instalment_count == 26
+        assert result.instalment_frequency == "quarterly"
+        assert result.repayment_months == 78
+
+    def test_repayment_months_stays_an_integer(self):
+        """A float here renders as 'over 78.0 months' in a live message."""
+        result = calculate_emi(
+            project_cost=500_000, financing_pct=0.90, rate_annual=8.0,
+            tenure_months=84, moratorium_months=6, periods_per_year=4,
+        )
+        assert isinstance(result.repayment_months, int)
+        assert isinstance(result.instalment_count, int)
+
+    def test_quarterly_instalment_is_about_three_monthly_payments(self):
+        params = {
+            "project_cost": 500_000, "financing_pct": 0.90, "rate_annual": 8.0,
+            "tenure_months": 84, "moratorium_months": 6,
+        }
+        monthly = calculate_emi(**params, periods_per_year=12)
+        quarterly = calculate_emi(**params, periods_per_year=4)
+        ratio = quarterly.instalment_amount / monthly.instalment_amount
+        assert 2.9 < ratio < 3.1
+
+    def test_monthly_equivalent_divides_the_instalment(self):
+        result = calculate_emi(
+            project_cost=500_000, financing_pct=0.90, rate_annual=8.0,
+            tenure_months=84, moratorium_months=6, periods_per_year=4,
+        )
+        assert abs(result.monthly_equivalent - result.instalment_amount / 3) < 0.01
+
+    def test_capitalized_quarterly_costs_more_than_simple_quarterly(self):
+        """The compounding exponent must be the PERIOD count, not the month count."""
+        params = {
+            "project_cost": 500_000, "financing_pct": 0.90, "rate_annual": 8.0,
+            "tenure_months": 84, "moratorium_months": 6, "periods_per_year": 4,
+        }
+        capitalized = calculate_emi(**params, moratorium_type=MoratoriumType.CAPITALIZED)
+        simple = calculate_emi(**params, moratorium_type=MoratoriumType.SIMPLE_INTEREST)
+        assert capitalized.instalment_amount > simple.instalment_amount
+
+    def test_half_yearly_is_supported(self):
+        """Udyam Nidhi is published as quarterly OR half-yearly."""
+        result = calculate_emi(
+            project_cost=500_000, financing_pct=0.90, rate_annual=13.0,
+            tenure_months=60, moratorium_months=3, periods_per_year=2,
+        )
+        assert result.instalment_frequency == "half-yearly"
+
+    def test_periods_must_divide_twelve_evenly(self):
+        with pytest.raises(ValueError, match="divide 12"):
+            calculate_emi(
+                project_cost=100_000, financing_pct=0.90, rate_annual=8.0,
+                tenure_months=84, moratorium_months=6, periods_per_year=5,
+            )

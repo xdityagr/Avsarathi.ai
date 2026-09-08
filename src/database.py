@@ -51,24 +51,21 @@ DDL_STATEMENTS = [
         PRIMARY KEY (profile_fingerprint, language)
     )
     """,
-    """
-    CREATE TABLE IF NOT EXISTS schemes (
-        scheme_id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        max_project_cost INTEGER,
-        financing_pct REAL,
-        rate_min REAL,
-        rate_max REAL,
-        moratorium_months_min INTEGER,
-        moratorium_months_max INTEGER,
-        max_income INTEGER,
-        target_category TEXT,
-        requires_student INTEGER DEFAULT 0,
-        min_age INTEGER,
-        max_age INTEGER,
-        women_rebate_pct REAL DEFAULT 0.0
-    )
-    """,
+    # NOTE: there was a `schemes` table here. It was dead — nothing ever read it,
+    # and eligibility has always read the scheme corpus in Python. Worse, its
+    # columns (min_age, max_age, requires_student, target_category) were exactly
+    # the unverified fields deliberately removed from config. Two sources of truth
+    # for scheme numbers is the hazard this project is trying to solve, so the
+    # table is gone. The corpus (corpus/v1/schemes.json) is the single source.
+    #
+    # channel_partners: two DIFFERENT type discriminators live here, deliberately.
+    #   agency_type  — PRUDENTIAL discriminator ("SCA"/"RRB"/"OTHER"). Keys
+    #                  PRUDENTIAL_NORMS. Which rule applies to this partner?
+    #   partner_type — RATE/CAPABILITY discriminator, one of NSFDC's 8 published
+    #                  categories. Determines the beneficiary's interest rate
+    #                  (Udyam Nidhi is 13% via a cooperative bank, 15% via a small
+    #                  finance bank) and which schemes the partner may process.
+    # They are not interchangeable. Don't collapse them.
     """
     CREATE TABLE IF NOT EXISTS channel_partners (
         partner_id TEXT PRIMARY KEY,
@@ -80,10 +77,54 @@ DDL_STATEMENTS = [
         longitude REAL,
         net_npa_percentage REAL DEFAULT 0.0,
         cumulative_utilization REAL DEFAULT 1.0,
-        has_active_overdues INTEGER DEFAULT 0
+        has_active_overdues INTEGER DEFAULT 0,
+        partner_type TEXT,
+        pincode TEXT,
+        address TEXT,
+        confidence TEXT DEFAULT 'MOCKED',
+        source_url TEXT,
+        fetched_at TEXT,
+        corpus_version TEXT
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS partner_performance (
+        scope TEXT NOT NULL,
+        scope_key TEXT NOT NULL,
+        period TEXT NOT NULL,
+        allocation REAL,
+        disbursed REAL,
+        cumulative_utilization REAL,
+        beneficiaries INTEGER,
+        confidence TEXT NOT NULL DEFAULT 'MOCKED',
+        source_url TEXT,
+        fetched_at TEXT,
+        PRIMARY KEY (scope, scope_key, period)
+    )
+    """,
+    # First indexes in this file. The router looks partners up by state/district
+    # and by rough geography, and does it on the hot path.
+    "CREATE INDEX IF NOT EXISTS idx_partners_state ON channel_partners(state)",
+    "CREATE INDEX IF NOT EXISTS idx_partners_district ON channel_partners(district)",
+    "CREATE INDEX IF NOT EXISTS idx_partners_geo ON channel_partners(latitude, longitude)",
+    "CREATE INDEX IF NOT EXISTS idx_partners_type ON channel_partners(partner_type)",
 ]
+
+
+# Additive column upgrades for databases created before a column existed.
+# Kept in lockstep with DDL_STATEMENTS above: DDL is the desired end state,
+# this is the upgrade path for an existing file. Edit both together.
+ADDITIVE_COLUMNS: dict[str, dict[str, str]] = {
+    "channel_partners": {
+        "partner_type": "TEXT",
+        "pincode": "TEXT",
+        "address": "TEXT",
+        "confidence": "TEXT DEFAULT 'MOCKED'",
+        "source_url": "TEXT",
+        "fetched_at": "TEXT",
+        "corpus_version": "TEXT",
+    },
+}
 
 
 async def _set_pragmas(db: aiosqlite.Connection) -> None:
@@ -113,12 +154,50 @@ async def get_connection() -> aiosqlite.Connection:
     return db
 
 
+async def _ensure_columns(
+    db: aiosqlite.Connection,
+    table: str,
+    columns: dict[str, str],
+) -> list[str]:
+    """Add any missing columns to an existing table. Returns the columns added.
+
+    This is NOT a migration system, and shouldn't grow into one. It is additive
+    only: it cannot rename, drop, retype, add constraints, or backfill, and it
+    keeps no version history. It exists because `CREATE TABLE IF NOT EXISTS` is
+    a no-op on a table that already exists, so a developer with an older
+    data/avsarathi.db would otherwise hit "no such column" at runtime — during
+    demo prep, most likely, which is the worst possible time.
+
+    For anything this can't express, delete data/avsarathi.db and let
+    init_database() rebuild it.
+    """
+    cursor = await db.execute(f"PRAGMA table_info({table})")
+    rows = await cursor.fetchall()
+    if not rows:
+        # Table doesn't exist yet — DDL will create it with every column.
+        return []
+
+    existing = {row[1] for row in rows}
+    added: list[str] = []
+    for name, decl in columns.items():
+        if name not in existing:
+            await db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+            added.append(name)
+    return added
+
+
 async def init_database() -> None:
     """Create all tables if they don't exist. Called once at app startup."""
     db = await get_connection()
     try:
         for ddl in DDL_STATEMENTS:
             await db.execute(ddl)
+
+        for table, columns in ADDITIVE_COLUMNS.items():
+            added = await _ensure_columns(db, table, columns)
+            if added:
+                logger.info("Added columns to %s: %s", table, ", ".join(added))
+
         await db.commit()
         logger.info("Database initialized successfully at %s", get_settings().database_path)
     finally:

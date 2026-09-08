@@ -31,7 +31,22 @@ from typing import TypedDict, Literal, Optional
 
 from langgraph.graph import StateGraph, END
 
-from src.schemes import UserProfile, SchemeMatch, evaluate_eligible_schemes
+from src.schemes import (
+    UserProfile,
+    SchemeMatch,
+    evaluate_eligibility,
+    evaluate_eligible_schemes,
+)
+from src.literacy import (
+    format_fraud_shield,
+    format_instalment,
+    format_moneylender_comparison,
+    format_moratorium_strip,
+    format_priority_note,
+    format_scheme_comparison,
+    format_true_cost,
+    format_why_not,
+)
 from src.calculator import calculate_emi, MoratoriumType
 from src.config import get_settings, SCHEMES
 
@@ -384,7 +399,8 @@ async def process_intake(state: ConversationState) -> ConversationState:
             annual_income=state.get("annual_income", 0.0),
             gender=gender,
         )
-        matches = evaluate_eligible_schemes(profile)
+        eligibility = evaluate_eligibility(profile)
+        matches = eligibility.matches
         language = "en"  # Future: read from state if multi-lingual
         
         fingerprint = generate_fingerprint(matches)
@@ -401,10 +417,13 @@ async def process_intake(state: ConversationState) -> ConversationState:
             
         # Format results using the template and the user's specific math
         response = format_recommendation(template, profile, matches)
-        
-        # Append EMI details if matches found (replicates Phase 1 formatting)
+
         if matches:
-            response += "\n\n" + _format_emi_details(profile, matches, gender)
+            response += "\n\n" + _format_outcome(profile, eligibility, gender)
+        elif eligibility.category_note:
+            # No Dead Ends — hand an out-of-category user to the right
+            # corporation rather than leaving them at a wall.
+            response += "\n\n" + eligibility.category_note
 
         return {
             **state,
@@ -439,46 +458,79 @@ async def process_intake(state: ConversationState) -> ConversationState:
     }
 
 
-def _format_emi_details(profile: UserProfile, matches: list[SchemeMatch], gender: str) -> str:
-    """Format the EMI calculation block (Phase 1 logic)."""
-    settings = get_settings()
-    parts = []
-    
-    for i, match in enumerate(matches, 1):
-        emi_result = calculate_emi(
-            project_cost=profile.project_cost,
-            financing_pct=match.financing_pct,
-            rate_annual=match.rate_min,
-            tenure_months=settings.default_tenure_months,
-            moratorium_months=settings.default_moratorium_months,
-            moratorium_type=MoratoriumType.SIMPLE_INTEREST,
-            women_rebate_pct=match.women_rebate_pct,
-            is_female=(gender == "female"),
-        )
-        
-        if len(matches) > 1:
-            parts.append(f"*{i}. {match.name}*")
-            
-        parts.append(
-            f"📊 Loan amount: ₹{emi_result.loan_amount:,.0f}\n"
-            f"EMI after {emi_result.moratorium_months}-month grace period: "
-            f"₹{emi_result.emi_after_moratorium:,.0f}/month"
-        )
-        if emi_result.moratorium_monthly_payment > 0:
-            parts.append(
-                f"During grace period: ₹{emi_result.moratorium_monthly_payment:,.0f}/month (interest only)"
-            )
-        parts.append(
-            f"Total repayment: ₹{emi_result.total_payable:,.0f} "
-            f"over {emi_result.repayment_months} months"
-        )
-        parts.append("")  
-        
-    parts.append(
-        "*(These are estimates — final terms are set by your Channel Partner.)*\n\n"
-        "Reply *START OVER* to try with different details, or *STOP* to end."
+def _price(match: SchemeMatch, profile: UserProfile, gender: str):
+    """Price one scheme on ITS OWN published terms.
+
+    The previous version used settings.default_tenure_months (84) and
+    default_moratorium_months (6) for every scheme, and produced a MONTHLY
+    instalment. Both are wrong now the corpus is real: Micro Finance runs 36
+    months with a 3-month grace, Udyam Nidhi 60, the Educational Loan 144 — and
+    every NSFDC scheme repays QUARTERLY, so a monthly EMI is a number the
+    borrower is never actually asked for.
+    """
+    return calculate_emi(
+        project_cost=profile.project_cost,
+        financing_pct=match.financing_pct,
+        rate_annual=match.rate_min,
+        tenure_months=match.tenure_months,
+        moratorium_months=match.moratorium_months,
+        moratorium_type=MoratoriumType.SIMPLE_INTEREST,
+        women_rebate_pct=match.women_rebate_pct,
+        is_female=(gender == "female"),
+        periods_per_year=match.periods_per_year,
     )
-    return "\n".join(parts)
+
+
+def _format_outcome(profile: UserProfile, eligibility, gender: str) -> str:
+    """Compose the reply from the same blocks the web portal uses.
+
+    Everything here is deterministic (src/literacy.py) — no model. The LLM still
+    writes the scheme intro above, cached per outcome fingerprint, but no rupee
+    figure a borrower sees is generated, so none can be hallucinated.
+
+    Schemes are ordered by what they actually cost, cheapest first: a person can
+    qualify for Micro Finance at 6.5% and Aajeevika at 15% on the same project,
+    and nobody tells them.
+    """
+    priced = [(m, _price(m, profile, gender)) for m in eligibility.matches]
+    priced.sort(key=lambda pair: pair[1].total_interest)
+
+    best_match, best_emi = priced[0]
+    parts: list[str] = []
+
+    if len(priced) > 1:
+        parts.append("*Cheapest for you: " + best_match.name + "*")
+
+    parts.append(format_instalment(best_emi))
+    parts.append(format_true_cost(best_emi))
+
+    strip = format_moratorium_strip(best_emi)
+    if strip:
+        parts.append(strip)
+
+    parts.append(format_moneylender_comparison(best_emi))
+
+    comparison = format_scheme_comparison(priced)
+    if comparison:
+        parts.append(comparison)
+
+    why_not = format_why_not(eligibility)
+    if why_not:
+        parts.append(why_not)
+
+    priority = format_priority_note(
+        {"women": 0.40} if best_match.scheme_id in ("TERM_LOAN", "MICRO_FINANCE") else None,
+        gender,
+    )
+    if priority:
+        parts.append(priority)
+
+    parts.append(format_fraud_shield())
+    parts.append(
+        "_These are estimates — final terms are set by your Channel Partner._" + "\n"
+        + "Reply *START OVER* for different details, or *STOP* to end."
+    )
+    return "\n\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
