@@ -5,6 +5,7 @@ import { BadgeCheck, Calculator, Languages, MapPin, Search } from "lucide-react"
 
 import { LANGUAGE_META, useLanguage } from "@/components/language-provider";
 import { askForLocation } from "@/components/location-gate";
+import { Orb } from "@/components/orb";
 import { WhatsAppQrPanel } from "@/components/whatsapp-door";
 import { readPlaceCookie } from "@/lib/i18n/config";
 
@@ -43,7 +44,7 @@ export function AssistantRail({ state }: { state: string | null }) {
   return (
     <aside className="hidden w-[19rem] shrink-0 flex-col gap-9 overflow-y-auto border-e border-border px-6 py-10 lg:flex">
       <div>
-        <span className="avs-orb block size-11" aria-hidden />
+        <Orb className="size-11" />
         <h1 className="mt-4 font-display text-[1.375rem] font-normal tracking-[-0.02em]">
           {t("chat.title")}
         </h1>

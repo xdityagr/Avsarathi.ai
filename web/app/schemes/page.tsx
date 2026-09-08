@@ -189,7 +189,7 @@ function SchemeListCard({
     <li className="group border-b border-border">
       <Link
         href={`/schemes/${scheme.slug}`}
-        className="-mx-3 block rounded-xl px-3 py-6 transition-colors hover:bg-accent/50"
+        className="-mx-3 block rounded-xl px-3 py-6 transition-colors duration-200 hover:bg-accent/50"
       >
         <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.8125rem] text-faint">
           <span className="text-leaf">

@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/components/language-provider";
+import { MapCard } from "@/components/map-card";
 import { cn } from "@/lib/utils";
 
 type T = ReturnType<typeof useLanguage>["t"];
@@ -397,16 +398,12 @@ function Results({ result, t }: { result: Recommendation; t: T }) {
           </ul>
 
           {result.map_url ? (
-            <div className="mt-4 overflow-hidden rounded-xl border border-border">
-              <Image
-                src={result.map_url}
-                alt={t("chat.whereToApply")}
-                width={720}
-                height={450}
-                unoptimized
-                className="h-auto w-full"
-              />
-            </div>
+            <MapCard
+              className="mt-4"
+              url={result.map_url}
+              alt={t("chat.map.alt")}
+              caption={t("chat.map.caption")}
+            />
           ) : null}
         </section>
       ) : null}

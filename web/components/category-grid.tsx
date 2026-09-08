@@ -41,9 +41,9 @@ export function CategoryGrid({
         <Link
           key={category.name}
           href={`/schemes?category=${encodeURIComponent(category.name)}`}
-          className="group bg-card px-5 py-6 transition-colors hover:bg-accent"
+          className="group bg-card px-5 py-6 transition-colors duration-200 hover:bg-accent"
         >
-          <span className="tnum block font-display text-[1.75rem] font-light leading-none tracking-[-0.03em] text-leaf">
+          <span className="tnum block font-display text-[1.75rem] font-light leading-none tracking-[-0.03em] text-leaf transition-transform duration-200 group-hover:-translate-y-0.5">
             {category.count.toLocaleString("en-IN")}
           </span>
           <span className="mt-2.5 block text-[0.9375rem] leading-snug text-foreground">

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import {
   useCallback,
@@ -22,33 +21,20 @@ import {
   RotateCcw,
   Search,
   Sparkles,
+  X,
   XCircle,
 } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
 import { readPlaceCookie } from "@/lib/i18n/config";
+import { MapCard } from "@/components/map-card";
 import { Markdown } from "@/components/markdown";
+import { Orb } from "@/components/orb";
 import { VoiceButton } from "@/components/voice-button";
 import { WhatsAppDoor } from "@/components/whatsapp-door";
+import { useProfile } from "@/components/profile-sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-/**
- * The assistant, as a mark.
- *
- * Turns while it is working and is still otherwise. It is the only animated
- * thing on the site, which is what makes it read as "thinking" rather than as
- * decoration — if everything moved, this would mean nothing.
- */
-function Orb({ busy = false, className }: { busy?: boolean; className?: string }) {
-  return (
-    <span
-      aria-hidden
-      data-busy={busy}
-      className={cn("avs-orb block shrink-0", className ?? "size-7")}
-    />
-  );
-}
 
 interface Chip {
   value: string;
@@ -115,11 +101,28 @@ export function ChatPanel({
   /** Lookups already finished in the turn still running. */
   const [live, setLive] = useState<Trace[]>([]);
   const [agentic, setAgentic] = useState<boolean | null>(null);
+  /**
+   * Whether the scheme this conversation was opened from has been let go.
+   *
+   * Dropping it has to mean dropping it — the chip disappearing while the slug
+   * carries on riding along in every request would be a lie told by the
+   * interface about what the assistant is looking at.
+   */
+  const [schemeDropped, setSchemeDropped] = useState(false);
+  const activeScheme = schemeDropped ? undefined : scheme;
   const knownState = useSyncExternalStore(
     () => () => {},
     readPlaceCookie,
     () => null,
   );
+  /**
+   * What the person has already told the "About you" sheet.
+   *
+   * It never leaves their device except as part of a question that needs it —
+   * and it is what stops the assistant asking for a name, a district or an
+   * income that is already written down.
+   */
+  const profile = useProfile();
   /**
    * The prefilled WhatsApp message, once a handoff code has been minted.
    *
@@ -189,8 +192,11 @@ export function ChatPanel({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             context: {
+              ...profile,
               ...(knownState ? { state: knownState } : {}),
-              ...(scheme ? { scheme: scheme.slug, scheme_name: scheme.name } : {}),
+              ...(activeScheme
+                ? { scheme: activeScheme.slug, scheme_name: activeScheme.name }
+                : {}),
               language: lang,
             },
             history: carry,
@@ -203,7 +209,7 @@ export function ChatPanel({
         // Leave waPrefill null; the door falls back to a plain greeting.
       }
     },
-    [knownState, lang, scheme, t],
+    [knownState, lang, activeScheme, profile, t],
   );
 
   /* ----------------------------------------------------------------- agent */
@@ -236,8 +242,13 @@ export function ChatPanel({
           message,
           history,
           context: {
+            // What the person told the sheet travels with every question, so
+            // the assistant stops asking for things it has already been given.
+            ...profile,
             ...(knownState ? { state: knownState } : {}),
-            ...(scheme ? { scheme: scheme.slug, scheme_name: scheme.name } : {}),
+            ...(activeScheme
+              ? { scheme: activeScheme.slug, scheme_name: activeScheme.name }
+              : {}),
           },
           language: lang,
         }),
@@ -308,7 +319,7 @@ export function ChatPanel({
         setLive([]);
       }
     },
-    [turns, startScripted, lang, knownState, scheme, ensureHandoff],
+    [turns, startScripted, lang, knownState, activeScheme, profile, ensureHandoff],
   );
 
   /* ------------------------------------------------------------------ mode */
@@ -337,6 +348,23 @@ export function ChatPanel({
     setDraft("");
     if (agentic) void askAgent(message.trim());
     else void startScripted(message.trim());
+  };
+
+  /**
+   * Let the scheme go, and take it out of the address bar too.
+   *
+   * Leaving ?scheme= in the URL would resurrect the chip on the next reload,
+   * which reads as the dismissal not having worked. history.replaceState does
+   * this without asking the server to re-render the route — there is nothing
+   * new for it to send.
+   */
+  const dropScheme = () => {
+    setSchemeDropped(true);
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("scheme")) return;
+    url.searchParams.delete("scheme");
+    window.history.replaceState(null, "", url.pathname + url.search);
   };
 
   const restart = () => {
@@ -368,12 +396,12 @@ export function ChatPanel({
             {turns.map((turn, index) =>
               turn.from === "user" ? (
                 <div key={index} className="flex justify-end">
-                  <p className="max-w-[85%] whitespace-pre-wrap rounded-[1.125rem] rounded-ee-md bg-primary px-4 py-3 text-[0.9375rem] leading-relaxed text-primary-foreground">
+                  <p className="motion-in-end max-w-[85%] whitespace-pre-wrap rounded-[1.125rem] rounded-ee-md bg-primary px-4 py-3 text-[0.9375rem] leading-relaxed text-primary-foreground">
                     {turn.text}
                   </p>
                 </div>
               ) : (
-                <div key={index} className="space-y-3">
+                <div key={index} className="motion-in-start space-y-3">
                   {turn.trace?.length ? <TraceList trace={turn.trace} /> : null}
                   {turn.text ? (
                     <div className="flex gap-3">
@@ -435,7 +463,7 @@ export function ChatPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => send(chip.value)}
-                  className="rounded-full border border-border bg-card px-4 py-2 text-[0.875rem] transition-colors hover:border-leaf/40 hover:bg-accent disabled:opacity-50"
+                  className="motion-rise-in rounded-full border border-border bg-card px-4 py-2 text-[0.875rem] transition-colors hover:border-leaf/40 hover:bg-accent disabled:opacity-50"
                 >
                   {chip.label}
                 </button>
@@ -470,16 +498,25 @@ export function ChatPanel({
             attachment is one the person cannot tell is missing when it is —
             so it is shown, and it links back to the page they came from.
           */}
-          {scheme ? (
-            <Link
-              href={`/schemes/${scheme.slug}`}
-              className="mb-2 flex w-fit max-w-full items-center gap-2 rounded-full border border-border
-                         bg-secondary/60 px-3 py-1.5 text-xs text-muted-foreground
-                         transition-colors hover:border-leaf/40 hover:text-foreground"
-            >
-              <FileText className="size-3.5 shrink-0 text-leaf" />
-              <span className="line-clamp-1">{scheme.name}</span>
-            </Link>
+          {activeScheme ? (
+            <div className="motion-in-start mb-2 flex w-fit max-w-full items-center rounded-full border border-border bg-secondary/60 text-xs text-muted-foreground transition-colors focus-within:border-leaf/40 hover:border-leaf/40">
+              <Link
+                href={`/schemes/${activeScheme.slug}`}
+                className="flex min-w-0 items-center gap-2 rounded-full py-1.5 ps-3 transition-colors hover:text-foreground"
+              >
+                <FileText className="size-3.5 shrink-0 text-leaf" />
+                <span className="line-clamp-1">{activeScheme.name}</span>
+              </Link>
+              <button
+                type="button"
+                onClick={dropScheme}
+                aria-label={t("chat.scheme.remove")}
+                title={t("chat.scheme.remove")}
+                className="me-1 ms-1.5 flex size-6 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-foreground/8 hover:text-foreground"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
           ) : null}
 
           <form
@@ -594,13 +631,13 @@ function Opening({
           In the guided flow the options below the composer are the way in. */}
       <div className={agentic ? "mt-9 w-full max-w-xl" : "hidden"}>
         <p className="meta">{t("chat.try.label")}</p>
-        <div className="mt-4 flex flex-col gap-2">
+        <div className="motion-stagger mt-4 flex flex-col gap-2">
           {suggestions.map((suggestion) => (
             <button
               key={suggestion}
               type="button"
               onClick={() => onPick(suggestion)}
-              className="group flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-3.5 text-start text-[0.9375rem] leading-relaxed transition-colors hover:border-leaf/40 hover:bg-accent"
+              className="group lift flex items-center justify-between gap-4 rounded-2xl border border-border bg-card px-4 py-3.5 text-start text-[0.9375rem] leading-relaxed hover:border-leaf/40 hover:bg-accent"
             >
               <span>{suggestion}</span>
               <ArrowUp className="size-4 shrink-0 rotate-45 text-faint transition-colors group-hover:text-leaf" />
@@ -964,16 +1001,11 @@ function CardView({
 
     case "map":
       return (
-        <div className="overflow-hidden rounded-xl border border-border">
-          <Image
-            src={s("url") ?? ""}
-            alt="Map of the nearest offices that can process your application"
-            width={640}
-            height={400}
-            unoptimized
-            className="h-auto w-full"
-          />
-        </div>
+        <MapCard
+          url={s("url") ?? ""}
+          alt={tr("chat.map.alt")}
+          caption={tr("chat.map.caption")}
+        />
       );
 
     case "notice": {

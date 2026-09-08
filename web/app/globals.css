@@ -429,7 +429,7 @@
     radial-gradient(ellipse 90% 55% at 50% 10%, rgba(238, 150, 32, 0.42), transparent 58%),
     radial-gradient(ellipse 70% 42% at 80% 20%, rgba(222, 112, 64, 0.24), transparent 58%),
     radial-gradient(ellipse 78% 46% at 18% 24%, rgba(86, 164, 132, 0.26), transparent 60%);
-  animation: avs-splash-out 1.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: avs-splash-out 1.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 .avs-splash-inner {
   display: flex;
@@ -455,7 +455,7 @@
   to { opacity: 1; transform: none; }
 }
 @keyframes avs-splash-out {
-  0%, 64% { opacity: 1; visibility: visible; }
+  0%, 58% { opacity: 1; visibility: visible; }
   100% { opacity: 0; visibility: hidden; transform: scale(1.015); }
 }
 
@@ -518,4 +518,124 @@
 @keyframes avs-shimmer {
   from { background-position: 220% 0; }
   to { background-position: -220% 0; }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion.
+
+   Two rules govern everything below. Only transform and opacity are animated,
+   because those are the two a browser can hand to the compositor — anything
+   touching layout drops frames on the ₹6,000 phone this is mostly read on.
+   And nothing a person is waiting for is ever delayed by an animation: the
+   entrance timings here are all short enough to finish before a reader has
+   found the start of the sentence.
+
+   The reduced-motion rule near the top of this file switches all of it off.
+--------------------------------------------------------------------------- */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-fast: 160ms;
+  --motion: 260ms;
+  --motion-slow: 520ms;
+}
+
+@keyframes motion-rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes motion-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes motion-in-end {
+  from { opacity: 0; transform: translate3d(8px, 4px, 0); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes motion-in-start {
+  from { opacity: 0; transform: translate3d(-8px, 4px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Scroll reveal.
+   Armed by JavaScript on mount, never in the server markup — so a reader
+   whose script never runs gets a plain visible page instead of a blank one
+   waiting for an observer that will never fire. */
+.motion-reveal[data-armed="1"] {
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  will-change: opacity, transform;
+}
+.motion-reveal[data-armed="1"][data-shown="1"] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--motion-slow) var(--ease-out),
+    transform var(--motion-slow) var(--ease-out);
+  will-change: auto;
+}
+
+/* A group whose children arrive one after another rather than all at once.
+   Six steps at 60ms is 360ms end to end — a cascade you feel and do not wait
+   for. Past the sixth child everything shares the last delay, because a long
+   list that keeps stepping turns into a queue. */
+.motion-stagger > * {
+  animation: motion-rise var(--motion-slow) var(--ease-out) both;
+}
+.motion-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.motion-stagger > *:nth-child(2) { animation-delay: 60ms; }
+.motion-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.motion-stagger > *:nth-child(4) { animation-delay: 180ms; }
+.motion-stagger > *:nth-child(5) { animation-delay: 240ms; }
+.motion-stagger > *:nth-child(n + 6) { animation-delay: 300ms; }
+
+@utility motion-fade-in {
+  animation: motion-fade var(--motion) var(--ease-soft) both;
+}
+@utility motion-rise-in {
+  animation: motion-rise var(--motion-slow) var(--ease-out) both;
+}
+@utility motion-in-end {
+  animation: motion-in-end var(--motion) var(--ease-out) both;
+}
+@utility motion-in-start {
+  animation: motion-in-start var(--motion) var(--ease-out) both;
+}
+
+/* The arrow on a call to action leans toward where it is taking you. 2px —
+   enough to notice on hover, not enough to look like it came loose. */
+@utility nudge {
+  transition: transform var(--motion-fast) var(--ease-out);
+}
+.group:hover .nudge,
+a:hover > .nudge,
+button:hover > .nudge {
+  transform: translateX(2px);
+}
+[dir="rtl"] .group:hover .nudge,
+[dir="rtl"] a:hover > .nudge,
+[dir="rtl"] button:hover > .nudge {
+  transform: translateX(-2px);
+}
+
+/* A surface that lifts very slightly when pointed at, and settles when
+   pressed. Pointer-only: on a touch screen :hover sticks after the tap.
+
+   `@utility` has to sit at the top level — Tailwind v4 registers these while
+   building the utility layer, before any at-rule is evaluated, so one nested
+   inside `@media` is a build error rather than a conditional utility. The
+   media query goes INSIDE it instead, which is what was meant anyway: the
+   transition is declared for pointer devices only. */
+@utility lift {
+  @media (hover: hover) and (pointer: fine) {
+    transition:
+      transform var(--motion) var(--ease-out),
+      box-shadow var(--motion) var(--ease-out),
+      border-color var(--motion) var(--ease-out);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover { transform: translate3d(0, -2px, 0); }
+  .lift:active { transform: translate3d(0, 0, 0); }
 }

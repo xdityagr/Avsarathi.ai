@@ -90,7 +90,7 @@ export function WhatsAppQrPanel({ className }: { className?: string }) {
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        "group block w-fit rounded-[1.25rem] bg-white p-4 text-center shadow-[0_18px_44px_-20px_rgba(0,0,0,0.5)] transition-transform duration-200 hover:-translate-y-0.5",
+        "lift group block w-fit rounded-[1.25rem] bg-white p-4 text-center shadow-[0_18px_44px_-20px_rgba(0,0,0,0.5)]",
         className,
       )}
     >

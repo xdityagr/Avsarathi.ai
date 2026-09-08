@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, FileText, Sparkles } from "lucide-react";
 
 import { Markdown } from "@/components/markdown";
+import { Orb } from "@/components/orb";
 import { ButtonLink } from "@/components/ui/button-link";
 import {
   Accordion,
@@ -148,7 +149,8 @@ export default async function SchemePage({
             </p>
             <ButtonLink
               href={`/check?scheme=${encodeURIComponent(scheme.slug)}`}
-              className="mt-4 h-10 w-full"
+              size="pill"
+              className="mt-4 w-full"
             >
               {t("scheme.qualify.cta")}
             </ButtonLink>
@@ -160,16 +162,22 @@ export default async function SchemePage({
             retype a fifteen-word official title to ask about it.
           */}
           <div className="card-quiet p-5">
-            <h2 className="text-sm font-semibold">{t("scheme.ask.title")}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            {/* The orb rather than a sparkle: this is the same assistant that
+                answers in the rail and on WhatsApp, and it should be
+                recognisably the same thing wherever it is offered. */}
+            <Orb className="size-9" />
+            <h2 className="mt-3.5 text-[0.9375rem] font-medium">
+              {t("scheme.ask.title")}
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
               {t("scheme.ask.body")}
             </p>
             <ButtonLink
               href={`/chat?scheme=${encodeURIComponent(scheme.slug)}`}
               variant="outline"
-              className="mt-4 h-10 w-full"
+              size="pill"
+              className="mt-4 w-full bg-card"
             >
-              <Sparkles className="size-4" />
               {t("scheme.ask.cta")}
             </ButtonLink>
           </div>

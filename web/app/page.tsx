@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import { CategoryGrid } from "@/components/category-grid";
 import { Marked } from "@/components/marked";
 import { Ornament } from "@/components/ornament";
+import { Reveal } from "@/components/reveal";
 import { ScrollCue } from "@/components/scroll-cue";
 import { WhatsAppDoor, WhatsAppQrPanel } from "@/components/whatsapp-door";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -28,7 +29,7 @@ export default async function HomePage() {
           lede and an eyebrow on the same narrow measure gives all three the
           same silhouette, and the page arrives as one block of centred text
           with no way in. Ranged left, the size ramp does the work instead. */}
-      <section className="mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-center px-5 pt-10 pb-28 text-start sm:px-6 sm:pb-32 sm:text-center">
+      <section className="motion-stagger mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-center px-5 pt-10 pb-28 text-start sm:px-6 sm:pb-32 sm:text-center">
         <Ornament className="h-5 w-36 opacity-70 sm:mx-auto sm:h-6 sm:w-44 sm:opacity-75" />
 
         <p className="mt-6 text-[0.8125rem] font-medium text-leaf sm:text-sm">
@@ -46,7 +47,7 @@ export default async function HomePage() {
         <div className="mt-8 flex flex-col items-stretch gap-2.5 sm:mt-9 sm:flex-row sm:items-center sm:justify-center sm:gap-3">
           <ButtonLink href="/check" size="pill-lg" className="font-medium">
             {t("home.cta.primary")}
-            <ArrowRight className="size-4" />
+            <ArrowRight className="nudge size-4" />
           </ButtonLink>
           <WhatsAppDoor size="pill-lg" />
         </div>
@@ -61,32 +62,36 @@ export default async function HomePage() {
           dropped into a poster — which is exactly what it looked like before.
           It is a ruled record instead: hairlines, tabular figures, air, and
           nothing boxed inside anything else. */}
-      <ProofRecord t={t} />
+      <Reveal>
+        <ProofRecord t={t} />
+      </Reveal>
       <ScrollCue />
 
       {/* ------------------------------------------------------------- Sources */}
-      <section className="mx-auto max-w-6xl px-5 pt-20 pb-4 text-center sm:px-6 sm:pt-24">
+      <Reveal as="section" className="mx-auto max-w-6xl px-5 pt-20 pb-4 text-center sm:px-6 sm:pt-24">
         <p className="meta">{t("home.sources")}</p>
         <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 font-display text-base font-normal text-faint">
           {["NSFDC", "NBCFDC", "NSKFDC", "myScheme", "MoSJE"].map((name) => (
             <li key={name}>{name}</li>
           ))}
         </ul>
-      </section>
+      </Reveal>
 
       {/* ----------------------------------------------------------- The asking */}
       <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6 sm:py-28">
-        <header className="mx-auto max-w-[62ch] text-center">
+        <Reveal as="header" className="mx-auto max-w-[62ch] text-center">
           <h2 className="text-[1.75rem] sm:text-[2.5rem]">{t("home.ask.h2")}</h2>
           <p className="mt-4 text-[1.0625rem] leading-relaxed text-muted-foreground">
             {t("home.ask.lede")}
           </p>
-        </header>
-        <ConversationPreview t={t} />
+        </Reveal>
+        <Reveal delay={80}>
+          <ConversationPreview t={t} />
+        </Reveal>
         <div className="mt-8 flex justify-center">
           <ButtonLink href="/chat" variant="outline" size="pill" className="bg-card">
             {t("home.ask.cta")}
-            <ArrowRight className="size-4" />
+            <ArrowRight className="nudge size-4" />
           </ButtonLink>
         </div>
       </section>
@@ -94,17 +99,19 @@ export default async function HomePage() {
       {/* ------------------------------------------------------------ Categories */}
       <section className="border-t border-border bg-card/60">
         <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 sm:py-24">
-          <header className="mx-auto max-w-[62ch] text-center">
+          <Reveal as="header" className="mx-auto max-w-[62ch] text-center">
             <h2 className="text-[1.75rem] sm:text-[2.5rem]">{t("home.cats.h2")}</h2>
             <p className="mt-4 text-[1.0625rem] leading-relaxed text-muted-foreground">
               {t("home.cats.lede")}
             </p>
-          </header>
-          <CategoryGrid categories={meta.categories} className="mt-12" />
+          </Reveal>
+          <Reveal delay={80}>
+            <CategoryGrid categories={meta.categories} className="mt-12" />
+          </Reveal>
           <div className="mt-10 flex justify-center">
             <ButtonLink href="/schemes" variant="outline" size="pill" className="bg-card">
               {t("home.cats.cta", { count })}
-              <ArrowRight className="size-4" />
+              <ArrowRight className="nudge size-4" />
             </ButtonLink>
           </div>
         </div>
@@ -112,7 +119,7 @@ export default async function HomePage() {
 
       {/* -------------------------------------------------------------- WhatsApp */}
       <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6 sm:py-24">
-        <div className="relative overflow-hidden rounded-[1.75rem] bg-forest-deep px-7 py-11 text-[#dcede4] sm:px-12 sm:py-14">
+        <Reveal className="relative overflow-hidden rounded-[1.75rem] bg-forest-deep px-7 py-11 text-[#dcede4] sm:px-12 sm:py-14">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_88%_18%,rgba(122,222,168,0.14),transparent_62%)]"
@@ -133,12 +140,12 @@ export default async function HomePage() {
             </div>
             <WhatsAppQrPanel className="shrink-0 self-center lg:self-auto" />
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ------------------------------------------------------------------ CTA */}
       <section className="border-t border-border">
-        <div className="mx-auto max-w-6xl px-5 py-20 text-center sm:px-6 sm:py-24">
+        <Reveal className="mx-auto max-w-6xl px-5 py-20 text-center sm:px-6 sm:py-24">
           <h2 className="mx-auto max-w-[18ch] text-[1.75rem] sm:text-[2.5rem]">
             {t("home.final.h2")}
           </h2>
@@ -148,10 +155,10 @@ export default async function HomePage() {
           <div className="mt-8 flex justify-center">
             <ButtonLink href="/check" size="pill-lg" className="font-medium">
               {t("home.final.cta")}
-              <ArrowRight className="size-4" />
+              <ArrowRight className="nudge size-4" />
             </ButtonLink>
           </div>
-        </div>
+        </Reveal>
       </section>
     </>
   );

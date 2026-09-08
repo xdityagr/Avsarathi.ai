@@ -80,13 +80,19 @@ export function SiteHeader() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "rounded-full px-2.5 py-2 transition-colors",
+                  "relative rounded-full px-2.5 py-2 transition-colors duration-200",
                   active
                     ? "text-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {t(item.key)}
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-2.5 -bottom-0.5 h-px origin-center scale-x-100 bg-leaf/60 motion-fade-in"
+                  />
+                ) : null}
               </Link>
             );
           })}

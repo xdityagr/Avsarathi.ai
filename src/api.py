@@ -23,6 +23,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from src import aadhaar_qr
 from src import application
 from src import handoff
 from src import speech
@@ -751,3 +752,43 @@ async def create_handoff(request: HandoffRequest) -> dict:
     """
     code = handoff.create(request.context, request.history)
     return {"code": code, "expires_in": handoff.TTL_SECONDS}
+
+
+class AadhaarQrRequest(BaseModel):
+    """Whatever the scanner read. One long decimal string, in practice."""
+    qr: str
+
+
+@router.post("/aadhaar/qr")
+async def read_aadhaar_qr(request: AadhaarQrRequest) -> dict:
+    """Turn an Aadhaar Secure QR into the fields an application form asks for.
+
+    The QR is printed on the card, so this is offline verification: the
+    resident presents their own card and we read it. No UIDAI onboarding, no
+    AUA/KUA licence, and no Aadhaar number — the payload does not contain one.
+
+    A payload that parses but does not carry a valid UIDAI signature is still
+    returned, marked `declared` rather than `verified`. Refusing to help
+    someone fill a form because our certificate is missing would punish them
+    for our own gap, and nothing here gates eligibility on proof.
+    """
+    try:
+        scanned = aadhaar_qr.scan(request.qr)
+    except aadhaar_qr.AadhaarQrError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    profile = aadhaar_qr.to_profile(scanned)
+    if profile.get("dob"):
+        profile["dob"] = aadhaar_qr.dob_to_iso(profile["dob"])
+
+    # Never the payload itself, and never the demographics — a short hash is
+    # enough to trace one scan through the logs.
+    logger.info("Aadhaar QR read (%s, verified=%s)",
+                aadhaar_qr.fingerprint(request.qr), scanned.verified)
+
+    return {
+        "profile": profile,
+        "verified": scanned.verified,
+        # Shown so someone can tell which card they just scanned.
+        "aadhaar_last4": scanned.aadhaar_last4,
+    }

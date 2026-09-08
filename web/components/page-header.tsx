@@ -38,6 +38,7 @@ export function PageHeader({
       className={cn(
         "mx-auto max-w-6xl px-5 pt-14 pb-10 sm:px-6 sm:pt-20 sm:pb-12",
         centred && "text-center",
+        "motion-stagger",
         className,
       )}
     >
