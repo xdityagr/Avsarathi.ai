@@ -291,4 +291,7 @@ export const gu: Strings = {
   "check.focus.also": "અને એ જ જવાબમાં તમે પાત્ર હો તે બધું પણ",
   "check.focus.submit": "આ યોજના તપાસો",
   "check.matching.from": "યોજનાઓ, તમે જે કહ્યું તેના આધારે",
+  "wa.prefill.resume": "નમસ્તે — વેબસાઇટ પરથી આગળ વધું છું. {code}",
+  "chat.continueWhatsApp": "આને WhatsApp પર આગળ વધારો",
+  "chat.continueWhatsApp.hint": "તમે જ્યાં છોડ્યું ત્યાંથી જ ચાલશે — ફરી પૂછવામાં નહીં આવે.",
 };

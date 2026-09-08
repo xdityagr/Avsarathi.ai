@@ -291,4 +291,7 @@ export const ml: Strings = {
   "check.focus.also": "അതേ ഉത്തരത്തിൽ നിങ്ങൾ അർഹരായ മറ്റെല്ലാം കൂടി",
   "check.focus.submit": "ഈ പദ്ധതി പരിശോധിക്കുക",
   "check.matching.from": "പദ്ധതികൾ, നിങ്ങൾ പറഞ്ഞതിന്റെ അടിസ്ഥാനത്തിൽ",
+  "wa.prefill.resume": "നമസ്കാരം — വെബ്‌സൈറ്റിൽ നിന്ന് തുടരുന്നു. {code}",
+  "chat.continueWhatsApp": "ഇത് WhatsApp-ൽ തുടരുക",
+  "chat.continueWhatsApp.hint": "നിർത്തിയിടത്തുനിന്ന് തുടരും — വീണ്ടും ചോദിക്കില്ല.",
 };

@@ -291,4 +291,7 @@ export const kn: Strings = {
   "check.focus.also": "ಮತ್ತು ಅದೇ ಉತ್ತರದಲ್ಲಿ ನೀವು ಅರ್ಹರಾದ ಉಳಿದೆಲ್ಲವೂ",
   "check.focus.submit": "ಈ ಯೋಜನೆ ಪರಿಶೀಲಿಸಿ",
   "check.matching.from": "ಯೋಜನೆಗಳು, ನೀವು ಹೇಳಿದ್ದರ ಆಧಾರದ ಮೇಲೆ",
+  "wa.prefill.resume": "ನಮಸ್ಕಾರ — ವೆಬ್‌ಸೈಟ್‌ನಿಂದ ಮುಂದುವರಿಸುತ್ತಿದ್ದೇನೆ. {code}",
+  "chat.continueWhatsApp": "ಇದನ್ನು WhatsApp ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
+  "chat.continueWhatsApp.hint": "ನೀವು ನಿಲ್ಲಿಸಿದಲ್ಲಿಂದಲೇ ಮುಂದುವರಿಯುತ್ತದೆ — ಮತ್ತೆ ಕೇಳುವುದಿಲ್ಲ.",
 };

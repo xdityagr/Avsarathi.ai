@@ -291,4 +291,7 @@ export const ta: Strings = {
   "check.focus.also": "அதே பதிலில் நீங்கள் தகுதி பெறும் மற்ற அனைத்தும்",
   "check.focus.submit": "இந்தத் திட்டத்தைச் சரிபார்க்கவும்",
   "check.matching.from": "திட்டங்கள், நீங்கள் சொன்னதன் அடிப்படையில்",
+  "wa.prefill.resume": "வணக்கம் — இணையதளத்திலிருந்து தொடர்கிறேன். {code}",
+  "chat.continueWhatsApp": "இதை WhatsApp-இல் தொடருங்கள்",
+  "chat.continueWhatsApp.hint": "நீங்கள் நிறுத்திய இடத்திலிருந்தே தொடரும் — மீண்டும் கேட்கப்பட மாட்டீர்கள்.",
 };

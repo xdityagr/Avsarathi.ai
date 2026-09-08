@@ -291,4 +291,7 @@ export const or: Strings = {
   "check.focus.also": "ଏବଂ ସେହି ଉତ୍ତରରେ ଆପଣ ଯୋଗ୍ୟ ଥିବା ସବୁକିଛି ମଧ୍ୟ",
   "check.focus.submit": "ଏହି ଯୋଜନା ଯାଞ୍ଚ କରନ୍ତୁ",
   "check.matching.from": "ଯୋଜନା, ଆପଣ ଯାହା କହିଛନ୍ତି ସେହି ଅନୁସାରେ",
+  "wa.prefill.resume": "ନମସ୍କାର — ୱେବସାଇଟରୁ ଆଗକୁ ବଢ଼ୁଛି। {code}",
+  "chat.continueWhatsApp": "ଏହାକୁ WhatsAppରେ ଆଗକୁ ବଢ଼ାନ୍ତୁ",
+  "chat.continueWhatsApp.hint": "ଆପଣ ଯେଉଁଠି ଛାଡ଼ିଥିଲେ ସେଠାରୁ ହିଁ ଚାଲିବ — ପୁଣି ପଚରାଯିବ ନାହିଁ।",
 };

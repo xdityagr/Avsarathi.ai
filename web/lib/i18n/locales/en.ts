@@ -291,4 +291,7 @@ export const en = {
   "check.focus.also": "and everything else you qualify for, in the same answer",
   "check.focus.submit": "Check this scheme",
   "check.matching.from": "schemes, narrowed by what you have told us",
+  "wa.prefill.resume": "Namaste — carrying on from the website. {code}",
+  "chat.continueWhatsApp": "Carry this on in WhatsApp",
+  "chat.continueWhatsApp.hint": "It will pick up where you left off — you will not be asked again.",
 } as const;

@@ -291,4 +291,7 @@ export const te: Strings = {
   "check.focus.also": "అదే సమాధానంలో మీరు అర్హులైన మిగతావన్నీ కూడా",
   "check.focus.submit": "ఈ పథకాన్ని పరిశీలించండి",
   "check.matching.from": "పథకాలు, మీరు చెప్పిన దాని ఆధారంగా",
+  "wa.prefill.resume": "నమస్కారం — వెబ్‌సైట్ నుండి కొనసాగిస్తున్నాను. {code}",
+  "chat.continueWhatsApp": "దీన్ని WhatsAppలో కొనసాగించండి",
+  "chat.continueWhatsApp.hint": "మీరు ఆపిన చోటి నుండే మొదలవుతుంది — మళ్లీ అడగరు.",
 };

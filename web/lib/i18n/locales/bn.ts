@@ -291,4 +291,7 @@ export const bn: Strings = {
   "check.focus.also": "এবং সেই একই উত্তরে আপনি যা যা পাওয়ার যোগ্য",
   "check.focus.submit": "এই প্রকল্প যাচাই করুন",
   "check.matching.from": "প্রকল্প, আপনি যা বলেছেন তার ভিত্তিতে",
+  "wa.prefill.resume": "নমস্কার — ওয়েবসাইট থেকে চালিয়ে যাচ্ছি। {code}",
+  "chat.continueWhatsApp": "এটি হোয়াটসঅ্যাপে চালিয়ে যান",
+  "chat.continueWhatsApp.hint": "যেখানে থেমেছিলেন সেখান থেকেই শুরু হবে — আবার জিজ্ঞেস করা হবে না।",
 };

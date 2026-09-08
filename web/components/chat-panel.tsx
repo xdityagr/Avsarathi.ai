@@ -120,6 +120,17 @@ export function ChatPanel({
     readPlaceCookie,
     () => null,
   );
+  /**
+   * The prefilled WhatsApp message, once a handoff code has been minted.
+   *
+   * WhatsApp's deep link carries text and nothing else — no parameters, no
+   * session — so the only way a conversation crosses is inside the message
+   * body. Without it, someone who answered six questions here is asked which
+   * state they live in the moment they arrive there, which reads as nobody
+   * having listened.
+   */
+  const [waPrefill, setWaPrefill] = useState<string | null>(null);
+  const handoffRef = useRef(false);
   const sessionRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -160,6 +171,39 @@ export function ChatPanel({
       }
     },
     [lang],
+  );
+
+  /**
+   * Minted once per conversation, and only after there is something worth
+   * carrying. Failure is silent on purpose: the WhatsApp door still works
+   * without a code, it simply starts fresh, and an error about a token nobody
+   * asked for would be noise.
+   */
+  const ensureHandoff = useCallback(
+    async (carry: { role: string; text: string }[]) => {
+      if (handoffRef.current) return;
+      handoffRef.current = true;
+      try {
+        const response = await fetch("/api/handoff", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            context: {
+              ...(knownState ? { state: knownState } : {}),
+              ...(scheme ? { scheme: scheme.slug, scheme_name: scheme.name } : {}),
+              language: lang,
+            },
+            history: carry,
+          }),
+        });
+        if (!response.ok) return;
+        const { code } = await response.json();
+        if (code) setWaPrefill(t("wa.prefill.resume", { code }));
+      } catch {
+        // Leave waPrefill null; the door falls back to a plain greeting.
+      }
+    },
+    [knownState, lang, scheme, t],
   );
 
   /* ----------------------------------------------------------------- agent */
@@ -250,6 +294,13 @@ export function ChatPanel({
             { from: "bot", text: "", cards: [...cards], trace: [...trace] },
           ]);
         }
+        // There is now a conversation worth carrying, so mint the code that
+        // carries it. Once per conversation, and never before there is
+        // anything in it.
+        void ensureHandoff([
+          ...history,
+          { role: "user", text: message },
+        ]);
       } catch {
         setFailed(true);
       } finally {
@@ -257,7 +308,7 @@ export function ChatPanel({
         setLive([]);
       }
     },
-    [turns, startScripted, lang, knownState, scheme],
+    [turns, startScripted, lang, knownState, scheme, ensureHandoff],
   );
 
   /* ------------------------------------------------------------------ mode */
@@ -389,6 +440,27 @@ export function ChatPanel({
                   {chip.label}
                 </button>
               ))}
+            </div>
+          ) : null}
+
+          {/*
+            Crossing to WhatsApp, once there is a conversation worth crossing
+            with. The code in the prefilled message is the only thing that
+            travels — WhatsApp's deep link carries text and nothing else — so
+            without this the person is asked their state again the moment they
+            arrive, four minutes after answering it here.
+          */}
+          {waPrefill ? (
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <WhatsAppDoor
+                size="pill-sm"
+                variant="soft"
+                prefill={waPrefill}
+                label={t("chat.continueWhatsApp")}
+              />
+              <span className="text-xs text-muted-foreground">
+                {t("chat.continueWhatsApp.hint")}
+              </span>
             </div>
           ) : null}
 

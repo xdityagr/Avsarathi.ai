@@ -294,4 +294,7 @@ export const pa: Strings = {
   "check.focus.also": "ਅਤੇ ਉਸੇ ਜਵਾਬ ਵਿੱਚ ਉਹ ਸਭ ਵੀ ਜਿਸਦੇ ਤੁਸੀਂ ਹੱਕਦਾਰ ਹੋ",
   "check.focus.submit": "ਇਹ ਸਕੀਮ ਜਾਂਚੋ",
   "check.matching.from": "ਸਕੀਮਾਂ, ਤੁਸੀਂ ਜੋ ਦੱਸਿਆ ਉਸ ਮੁਤਾਬਕ",
+  "wa.prefill.resume": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ — ਵੈੱਬਸਾਈਟ ਤੋਂ ਅੱਗੇ ਵਧ ਰਹੀ ਹਾਂ। {code}",
+  "chat.continueWhatsApp": "ਇਸਨੂੰ WhatsApp ਉੱਤੇ ਅੱਗੇ ਵਧਾਓ",
+  "chat.continueWhatsApp.hint": "ਜਿੱਥੇ ਛੱਡਿਆ ਸੀ ਉੱਥੋਂ ਹੀ ਚੱਲੇਗਾ — ਦੁਬਾਰਾ ਨਹੀਂ ਪੁੱਛਿਆ ਜਾਵੇਗਾ।",
 };

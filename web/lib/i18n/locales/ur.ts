@@ -295,4 +295,7 @@ export const ur: Strings = {
   "check.focus.also": "اور اسی جواب میں وہ سب بھی جن کے آپ اہل ہیں",
   "check.focus.submit": "یہ اسکیم جانچیں",
   "check.matching.from": "اسکیمیں، آپ نے جو بتایا اس کے مطابق",
+  "wa.prefill.resume": "نمستے — ویب سائٹ سے آگے بڑھ رہی ہوں۔ {code}",
+  "chat.continueWhatsApp": "اسے WhatsApp پر جاری رکھیں",
+  "chat.continueWhatsApp.hint": "جہاں چھوڑا تھا وہیں سے چلے گا — دوبارہ نہیں پوچھا جائے گا۔",
 };

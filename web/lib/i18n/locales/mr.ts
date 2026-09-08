@@ -291,4 +291,7 @@ export const mr: Strings = {
   "check.focus.also": "आणि त्याच उत्तरात तुम्ही पात्र असलेले बाकी सर्वही",
   "check.focus.submit": "ही योजना तपासा",
   "check.matching.from": "योजना, तुम्ही जे सांगितले त्यानुसार",
+  "wa.prefill.resume": "नमस्कार — वेबसाइटवरून पुढे चालू. {code}",
+  "chat.continueWhatsApp": "हे व्हॉट्सअॅपवर पुढे चालू ठेवा",
+  "chat.continueWhatsApp.hint": "तुम्ही जिथे थांबलात तिथूनच सुरू होईल — पुन्हा विचारले जाणार नाही.",
 };

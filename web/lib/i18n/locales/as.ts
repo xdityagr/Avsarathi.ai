@@ -291,4 +291,7 @@ export const as: Strings = {
   "check.focus.also": "আৰু সেই একেটা উত্তৰতে আপুনি যোগ্য হোৱা আন সকলোবোৰ",
   "check.focus.submit": "এই আঁচনি পৰীক্ষা কৰক",
   "check.matching.from": "আঁচনি, আপুনি যি ক’লে তাৰ ভিত্তিত",
+  "wa.prefill.resume": "নমস্কাৰ — ৱেবছাইটৰ পৰা আগবাঢ়িছোঁ। {code}",
+  "chat.continueWhatsApp": "ইয়াক WhatsApp ত আগবঢ়াওক",
+  "chat.continueWhatsApp.hint": "আপুনি য'ত এৰিছিল তাৰ পৰাই চলিব — পুনৰ সোধা নহ'ব।",
 };

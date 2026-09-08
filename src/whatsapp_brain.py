@@ -28,6 +28,7 @@ from typing import Deque
 
 from src.agent import is_available as agent_available, respond as agent_respond
 from src.chat import turn as scripted_turn
+from src import handoff
 from src import whatsapp_consent as consent
 from src.i18n import detect_language
 
@@ -185,6 +186,38 @@ def render_cards(cards: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _resume_from_web(user_id: str, text: str) -> str:
+    """Redeem a handoff code, and return the message without it.
+
+    Silent when there is no code, and silent when the code is stale or already
+    used — a person who forwarded an old link should simply get a normal first
+    conversation, not an error about a token they never knew existed.
+    """
+    code = handoff.find(text)
+    if not code:
+        return text
+
+    entry = handoff.claim(code)
+    if entry is None:
+        logger.info("Handoff code from %s was unknown or expired", user_id[:8])
+        return handoff.strip(text, code)
+
+    carried = {k: v for k, v in (entry.context or {}).items()
+               if v not in (None, "", [])}
+    if carried:
+        _CONTEXT[user_id].update(carried)
+    for turn in entry.history or []:
+        if turn.get("text"):
+            _HISTORY[user_id].append({"role": turn.get("role", "user"),
+                                      "text": turn["text"]})
+
+    # The notice still goes out — crossing channels is not consent to the new
+    # one — but everything they already told us comes with them.
+    logger.info("Resumed %s from the website (%s)",
+                user_id[:8], ", ".join(sorted(carried)) or "no context")
+    return handoff.strip(text, code)
+
+
 async def reply(user_id: str, text: str) -> str:
     """One WhatsApp turn: whatever they said, whatever we say back.
 
@@ -199,6 +232,12 @@ async def reply(user_id: str, text: str) -> str:
             _HISTORY.pop(user_id, None)
             _CONTEXT.pop(user_id, None)
         return gate
+
+    # A code from the website, redeemed before anything else looks at the
+    # message. Someone who answered six questions on the site and then crossed
+    # over must not be asked which state they live in — being asked again is
+    # the clearest possible signal that nobody was listening.
+    text = _resume_from_web(user_id, text)
 
     language = remember_language(user_id, text)
 
