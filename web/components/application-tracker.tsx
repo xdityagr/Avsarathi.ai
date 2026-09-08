@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -168,21 +169,22 @@ export function ApplicationTracker({ className }: { className?: string }) {
     setAdding(false);
   };
 
+  const { t } = useLanguage();
+
   return (
     <div className={className}>
       {applications.length === 0 && !adding ? (
-        <div className="rounded-xl border border-dashed border-border p-10 text-center">
+        <div className="rounded-2xl border border-dashed border-input p-12 text-center">
           <Clock className="mx-auto size-6 text-muted-foreground" />
-          <h2 className="mt-3 font-display text-xl font-bold">
-            Nothing being tracked yet
+          <h2 className="mt-3 font-display text-[1.25rem] font-normal">
+            {t("track.empty.title")}
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-            Add an application once you have submitted it. Everything you enter
-            stays in this browser — it is never sent to us.
+            {t("track.empty.body")}
           </p>
-          <Button className="mt-6 h-11 px-5" onClick={() => setAdding(true)}>
+          <Button className="mt-6 h-11 rounded-full px-5" onClick={() => setAdding(true)}>
             <Plus className="size-4" />
-            Add an application
+            {t("track.add")}
           </Button>
         </div>
       ) : null}
@@ -211,11 +213,11 @@ export function ApplicationTracker({ className }: { className?: string }) {
       {applications.length > 0 && !adding ? (
         <Button
           variant="outline"
-          className="mt-6 h-11 bg-card px-5"
+          className="mt-6 h-11 rounded-full bg-card px-5"
           onClick={() => setAdding(true)}
         >
           <Plus className="size-4" />
-          Add another
+          {t("track.add")}
         </Button>
       ) : null}
 
@@ -254,7 +256,7 @@ function AddForm({
         });
       }}
     >
-      <h2 className="font-display text-lg font-bold">Add an application</h2>
+      <h2 className="font-display text-[1.125rem] font-normal">Add an application</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -267,7 +269,7 @@ function AddForm({
             value={scheme}
             onChange={(event) => setScheme(event.target.value)}
             placeholder="e.g. Micro Finance Scheme"
-            className="mt-1.5 h-11 bg-paper text-base"
+            className="mt-2 h-12 rounded-xl bg-paper text-base"
           />
         </div>
         <div>
@@ -279,7 +281,7 @@ function AddForm({
             value={reference}
             onChange={(event) => setReference(event.target.value)}
             placeholder="From your receipt"
-            className="mt-1.5 h-11 bg-paper text-base"
+            className="mt-2 h-12 rounded-xl bg-paper text-base"
           />
         </div>
         <div>
@@ -291,7 +293,7 @@ function AddForm({
             value={office}
             onChange={(event) => setOffice(event.target.value)}
             placeholder="Branch or agency"
-            className="mt-1.5 h-11 bg-paper text-base"
+            className="mt-2 h-12 rounded-xl bg-paper text-base"
           />
         </div>
         <div>
@@ -303,19 +305,19 @@ function AddForm({
             type="date"
             value={appliedAt || defaultDate}
             onChange={(event) => setAppliedAt(event.target.value)}
-            className="mt-1.5 h-11 bg-paper text-base"
+            className="mt-2 h-12 rounded-xl bg-paper text-base"
           />
         </div>
       </div>
 
       <div className="flex gap-3">
-        <Button type="submit" className="h-11 px-5">
+        <Button type="submit" className="h-11 rounded-full px-5">
           Save
         </Button>
         <Button
           type="button"
           variant="ghost"
-          className="h-11 px-5"
+          className="h-11 rounded-full px-5"
           onClick={onCancel}
         >
           Cancel
@@ -352,7 +354,7 @@ function ApplicationCard({
     <article className="card-quiet p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-display text-lg font-bold">{application.scheme}</h2>
+          <h2 className="font-display text-[1.125rem] font-normal">{application.scheme}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {[application.office, application.reference && `Ref ${application.reference}`]
               .filter(Boolean)
@@ -457,18 +459,18 @@ function Escalation({ stage, next }: { stage: string; next: string }) {
     `along with the name of the officer handling my file.`;
 
   return (
-    <div className="mt-5 rounded-xl border border-caution/30 bg-caution-soft p-5">
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-caution">
+    <div className="mt-5 rounded-xl border border-clay/25 bg-clay-soft p-5">
+      <h3 className="flex items-center gap-2 text-sm font-semibold text-clay">
         <FileWarning className="size-4" />
         This has taken longer than it should
       </h3>
-      <p className="mt-2 text-sm leading-relaxed text-caution/90">
+      <p className="mt-2 text-sm leading-relaxed text-clay/90">
         Ask the branch first — most delays are a missing document nobody told you
         about. If that goes nowhere, this is the text of a grievance you can file
         on CPGRAMS.
       </p>
 
-      <p className="mt-3 rounded-lg border border-caution/20 bg-paper p-3 text-sm leading-relaxed">
+      <p className="mt-3 rounded-lg border border-clay/20 bg-paper p-3 text-sm leading-relaxed">
         {grievance}
       </p>
 
@@ -506,6 +508,9 @@ function Escalation({ stage, next }: { stage: string; next: string }) {
 }
 
 function OfficialLinks({ className }: { className?: string }) {
+  const { t } = useLanguage();
+  // Portal names stay in English — they are what the sign above the counter
+  // and the browser tab actually say.
   const links = [
     {
       href: "https://pfms.nic.in/Users/LoginDetails/Login.aspx",
@@ -526,10 +531,11 @@ function OfficialLinks({ className }: { className?: string }) {
 
   return (
     <section className={className}>
-      <h2 className="font-display text-xl font-bold">Check the official record</h2>
+      <h2 className="font-display text-[1.25rem] font-normal">
+        {t("track.official.title")}
+      </h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Your timeline above is your own note-keeping. These are the government
-        systems that hold the real answer.
+        {t("track.official.body")}
       </p>
       <ul className="mt-4 grid gap-3 sm:grid-cols-3">
         {links.map((link) => (
@@ -552,8 +558,7 @@ function OfficialLinks({ className }: { className?: string }) {
         ))}
       </ul>
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
-        We will never ask for your bank password or log in on your behalf. Anyone
-        who offers to do that, for a fee or otherwise, is not helping you.
+        {t("track.nocredentials")}
       </p>
     </section>
   );

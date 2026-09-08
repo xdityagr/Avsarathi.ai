@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useMemo, useTransition } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 import {
   DEFAULT_LANG,
@@ -37,9 +36,19 @@ export function useLanguage() {
  *
  * The value arrives as a prop from the root layout, which read it from the
  * cookie — so the first paint is already in the right language and there is no
- * flicker. Changing it writes the cookie and refreshes the route, which is what
- * makes server-rendered pages (the scheme catalogue, every detail page) come
- * back translated rather than only the interactive bits.
+ * flicker.
+ *
+ * Changing it reloads the document rather than calling router.refresh(). That
+ * looks heavy-handed and is not: refresh() only invalidates the route you are
+ * standing on, so the moment you switched language and then navigated to the
+ * scheme catalogue, Next served the payload it had already cached under the
+ * previous cookie. The result was a page whose nav and filters were in Hindi
+ * and whose heading was still in English — the language appearing to half
+ * apply, which is worse than it not applying at all.
+ *
+ * A reload drops the router cache entirely, so every server-rendered page on
+ * the site comes back in the new language. It happens once, on a deliberate
+ * choice someone makes at most a handful of times.
  */
 export function LanguageProvider({
   lang,
@@ -48,20 +57,15 @@ export function LanguageProvider({
   lang: Lang;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  const [switching, startSwitching] = useTransition();
+  const [switching, setSwitching] = useState(false);
 
-  const setLang = useCallback(
-    (next: Lang) => {
-      // A year, because someone who has chosen once should not choose again.
-      document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
-      document.documentElement.lang = next;
-      startSwitching(() => {
-        router.refresh();
-      });
-    },
-    [router],
-  );
+  const setLang = useCallback((next: Lang) => {
+    // A year, because someone who has chosen once should not choose again.
+    document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    document.documentElement.lang = next;
+    setSwitching(true);
+    window.location.reload();
+  }, []);
 
   const value = useMemo<LanguageValue>(
     () => ({ lang, setLang, switching, t: translator(lang) }),

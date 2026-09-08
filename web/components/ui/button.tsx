@@ -17,6 +17,12 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        /* The second door. WhatsApp is not a lesser option here — for a lot of
+           this audience it is the only one — so it gets its own colour rather
+           than the grey of a cancel button. */
+        whatsapp:
+          "border-[color-mix(in_oklch,var(--verified),transparent_78%)] bg-verified-soft text-[#0f5c3c] hover:bg-[color-mix(in_oklch,var(--verified-soft),var(--verified)_9%)]",
+        soft: "bg-mint text-primary hover:bg-[color-mix(in_oklch,var(--mint),var(--primary)_8%)]",
       },
       size: {
         default:
@@ -30,6 +36,12 @@ const buttonVariants = cva(
         "icon-sm":
           "size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg",
         "icon-lg": "size-9",
+        /* Pills. Every call to action on the site is one of these — the shape
+           is half of what makes the pages feel unhurried. */
+        pill: "h-11 gap-2 rounded-full px-6 text-[0.9375rem]",
+        "pill-lg": "h-12 gap-2 rounded-full px-7 text-base",
+        "pill-sm": "h-9 gap-1.5 rounded-full px-4 text-[0.8125rem]",
+        "pill-icon": "size-11 rounded-full",
       },
     },
     defaultVariants: {

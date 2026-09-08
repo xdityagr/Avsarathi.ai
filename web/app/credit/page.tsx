@@ -1,4 +1,6 @@
 import { CreditForm } from "@/components/credit-form";
+import { PageHeader } from "@/components/page-header";
+import { getT } from "@/lib/i18n/server";
 
 export const metadata = {
   title: "NSFDC loans",
@@ -7,22 +9,18 @@ export const metadata = {
     "a moneylender, and which office near you can actually disburse it.",
 };
 
-export default function CreditPage() {
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
-      <header className="max-w-3xl">
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">
-          What the loan actually costs
-        </h1>
-        <p className="mt-3 text-lg text-muted-foreground">
-          NSFDC runs five credit schemes for Scheduled Caste households, at rates
-          from 6% to 15%. They are not interchangeable, and picking the wrong one
-          can cost tens of thousands of rupees on the same project. This works out
-          which ones you qualify for and what each would take from you.
-        </p>
-      </header>
+export default async function CreditPage() {
+  const t = await getT();
 
-      <CreditForm className="mt-10" />
+  return (
+    <div className="pb-24">
+      <PageHeader
+        eyebrow={t("nav.credit")}
+        title={t("credit.h1")}
+        lede={t("credit.lede")}
+      />
+
+      <CreditForm className="mx-auto max-w-6xl px-5 sm:px-6" />
     </div>
   );
 }

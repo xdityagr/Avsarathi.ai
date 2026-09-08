@@ -16,7 +16,10 @@ import { OptionRow } from "@/components/option-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/components/language-provider";
 import { cn } from "@/lib/utils";
+
+type T = ReturnType<typeof useLanguage>["t"];
 
 interface Scheme {
   scheme_id: string;
@@ -149,18 +152,20 @@ export function CreditForm({ className }: { className?: string }) {
       setResult(await response.json());
     } catch {
       setError(
-        "The calculation did not come back. Nothing is lost — try once more.",
+        t("credit.failed"),
       );
     } finally {
       setBusy(false);
     }
   };
 
+  const { t } = useLanguage();
+
   return (
     <div className={cn("grid gap-8 lg:grid-cols-[360px_1fr]", className)}>
       <form onSubmit={submit} className="card-quiet h-fit space-y-5 p-6">
         <OptionRow
-          label="What is the money for?"
+          label={t("credit.purpose")}
           options={PURPOSES}
           value={purpose}
           onSelect={setPurpose}
@@ -168,12 +173,12 @@ export function CreditForm({ className }: { className?: string }) {
 
         <div>
           <Label htmlFor="cost" className="text-sm font-medium">
-            What will it cost to set up?
+            {t("credit.cost")}
           </Label>
           <Input
             id="cost"
             inputMode="numeric"
-            className="mt-1.5 h-11 bg-paper text-base"
+            className="mt-2 h-12 rounded-xl bg-paper text-base"
             value={cost}
             onChange={(event) => setCost(event.target.value.replace(/\D/g, ""))}
           />
@@ -181,34 +186,34 @@ export function CreditForm({ className }: { className?: string }) {
 
         <div>
           <Label htmlFor="income" className="text-sm font-medium">
-            Household income for a year
+            {t("credit.income")}
           </Label>
           <Input
             id="income"
             inputMode="numeric"
-            className="mt-1.5 h-11 bg-paper text-base"
+            className="mt-2 h-12 rounded-xl bg-paper text-base"
             value={income}
             onChange={(event) => setIncome(event.target.value.replace(/\D/g, ""))}
           />
           <p className="mt-1.5 text-xs text-muted-foreground">
-            Everyone in the house together. The NSFDC ceiling is ₹5,00,000.
+            {t("credit.income.hint")}
           </p>
         </div>
 
         <OptionRow
-          label="Category"
+          label={t("credit.category")}
           options={CATEGORIES}
           value={category}
           onSelect={setCategory}
         />
-        <OptionRow label="Gender" options={GENDERS} value={gender} onSelect={setGender} />
+        <OptionRow label={t("credit.gender")} options={GENDERS} value={gender} onSelect={setGender} />
 
         <div>
-          <p className="text-sm font-medium">Where are you?</p>
+          <p className="text-sm font-medium">{t("credit.where")}</p>
           <Button
             type="button"
             variant="outline"
-            className="mt-2 h-11 w-full justify-start bg-paper"
+            className="mt-2 h-12 w-full justify-start rounded-xl bg-paper"
             onClick={locate}
             disabled={locating}
           >
@@ -217,22 +222,22 @@ export function CreditForm({ className }: { className?: string }) {
             ) : (
               <LocateFixed className="size-4" />
             )}
-            {place ?? "Use my location"}
+            {place ?? t("credit.locate")}
           </Button>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            Only used to find the nearest office that can disburse.
+            {t("credit.where.hint")}
           </p>
         </div>
 
-        <Button type="submit" size="lg" className="h-12 w-full text-base" disabled={busy}>
+        <Button type="submit" size="lg" className="h-12 w-full rounded-full text-base" disabled={busy}>
           {busy ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              Working it out…
+              {t("credit.submitting")}
             </>
           ) : (
             <>
-              Work out my loan
+              {t("credit.submit")}
               <ArrowRight className="size-4" />
             </>
           )}
@@ -241,46 +246,44 @@ export function CreditForm({ className }: { className?: string }) {
 
       <div className="min-w-0">
         {error ? (
-          <p className="rounded-xl border border-border bg-caution-soft p-4 text-sm text-caution">
+          <p className="rounded-xl border border-border bg-clay-soft p-4 text-sm text-clay">
             {error}
           </p>
         ) : null}
 
         {!result ? (
-          <Placeholder />
+          <Placeholder t={t} />
         ) : (
-          <Results result={result} />
+          <Results result={result} t={t} />
         )}
       </div>
     </div>
   );
 }
 
-function Placeholder() {
+function Placeholder({ t }: { t: T }) {
   return (
-    <div className="rounded-xl border border-dashed border-border p-10 text-center">
-      <h2 className="font-display text-xl font-bold">
-        Your figures will appear here
+    <div className="rounded-2xl border border-dashed border-input p-12 text-center">
+      <h2 className="font-display text-[1.25rem] font-normal">
+        {t("credit.placeholder.h2")}
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-        Every rupee shown is calculated from the scheme&apos;s own published rate,
-        tenure and repayment cadence — NSFDC collects quarterly, not monthly, and
-        the instalment reflects that. No figure here is written by a model.
+        {t("credit.placeholder.body")}
       </p>
     </div>
   );
 }
 
-function Results({ result }: { result: Recommendation }) {
+function Results({ result, t }: { result: Recommendation; t: T }) {
   if (!result.eligible) {
     return (
-      <div className="rounded-xl border border-border bg-card p-6">
-        <h2 className="font-display text-xl font-bold">
-          Not this route — but not a dead end
+      <div className="card-quiet p-6 sm:p-7">
+        <h2 className="font-display text-[1.25rem] font-normal">
+          {t("credit.noroute.h2")}
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           {result.category_note ||
-            "These particular schemes do not fit, but other corporations run comparable credit for your category."}
+            t("credit.noroute.body")}
         </p>
       </div>
     );
@@ -299,29 +302,29 @@ function Results({ result }: { result: Recommendation }) {
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h3 className="font-display text-lg font-bold">{scheme.name}</h3>
+                <h3 className="font-display text-[1.125rem] font-normal">{scheme.name}</h3>
                 <p className="mt-0.5 text-sm text-muted-foreground">
                   {rupees(scheme.loan_amount)} at {scheme.rate}% ·{" "}
                   {scheme.instalment_frequency}
                 </p>
               </div>
               {index === 0 ? (
-                <span className="rounded-md bg-gold-soft px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-gold-ink">
-                  Cheapest
+                <span className="rounded-md bg-gold-soft px-2.5 py-1 text-[0.6875rem] font-semibold uppercase tracking-[0.09em] text-gold-ink">
+                  {t("chat.cheapest")}
                 </span>
               ) : null}
             </div>
 
             <dl className="mt-4 grid gap-3 sm:grid-cols-3">
               <Figure
-                label={`Each instalment (${scheme.instalment_count})`}
+                label={t("credit.instalment", { n: scheme.instalment_count })}
                 value={rupees(scheme.instalment_amount)}
               />
               <Figure
-                label="Interest in total"
+                label={t("chat.interest")}
                 value={rupees(scheme.total_interest)}
               />
-              <Figure label="You repay" value={rupees(scheme.total_payable)} />
+              <Figure label={t("credit.repay")} value={rupees(scheme.total_payable)} />
             </dl>
 
             <p className="mt-4 border-t border-border pt-3 text-sm leading-relaxed text-muted-foreground">
@@ -332,12 +335,12 @@ function Results({ result }: { result: Recommendation }) {
       </section>
 
       {result.scheme_comparison ? (
-        <PlainBlock title="They do not cost the same" body={result.scheme_comparison} />
+        <PlainBlock title={t("credit.compare")} body={result.scheme_comparison} />
       ) : null}
 
       {result.rejections.length > 0 ? (
-        <section className="rounded-xl border border-border bg-muted/40 p-5">
-          <h2 className="text-sm font-semibold">Not offered, and why</h2>
+        <section className="rounded-2xl bg-muted/50 p-5 sm:p-6">
+          <h2 className="text-sm font-semibold">{t("chat.notOffered")}</h2>
           <ul className="mt-2 space-y-1.5">
             {result.rejections.map((rejection) => (
               <li key={rejection.name} className="text-sm text-muted-foreground">
@@ -350,19 +353,19 @@ function Results({ result }: { result: Recommendation }) {
       ) : null}
 
       {result.fraud_shield ? (
-        <section className="flex gap-3 rounded-xl border border-caution/30 bg-caution-soft p-5">
-          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-caution" />
-          <p className="text-sm leading-relaxed text-caution">
+        <section className="flex gap-3 rounded-xl border border-clay/25 bg-clay-soft p-5">
+          <ShieldAlert className="mt-0.5 size-5 shrink-0 text-clay" />
+          <p className="text-sm leading-relaxed text-clay">
             {result.fraud_shield.replace(/[*⚠️]/g, "").trim()}
           </p>
         </section>
       ) : null}
 
       {result.partners.length > 0 ? (
-        <section className="rounded-xl border border-border bg-card p-5">
-          <h2 className="flex items-center gap-2 font-display text-lg font-bold">
+        <section className="card-quiet p-5 sm:p-6">
+          <h2 className="flex items-center gap-2 font-display text-[1.125rem] font-normal">
             <MapPin className="size-4" />
-            Where to go
+            {t("chat.whereToApply")}
           </h2>
           {result.cheapest_route ? (
             <p className="mt-2 text-sm text-muted-foreground">
@@ -394,10 +397,10 @@ function Results({ result }: { result: Recommendation }) {
           </ul>
 
           {result.map_url ? (
-            <div className="mt-4 overflow-hidden rounded-lg border border-border">
+            <div className="mt-4 overflow-hidden rounded-xl border border-border">
               <Image
                 src={result.map_url}
-                alt="Map showing the nearest offices that can disburse this loan"
+                alt={t("chat.whereToApply")}
                 width={720}
                 height={450}
                 unoptimized
@@ -409,8 +412,8 @@ function Results({ result }: { result: Recommendation }) {
       ) : null}
 
       {result.excluded_partners.length > 0 ? (
-        <section className="rounded-xl border border-border bg-muted/40 p-5">
-          <h2 className="text-sm font-semibold">Ruled out for you</h2>
+        <section className="rounded-2xl bg-muted/50 p-5 sm:p-6">
+          <h2 className="text-sm font-semibold">{t("chat.ruledOut")}</h2>
           <ul className="mt-2 space-y-1.5">
             {result.excluded_partners.map((partner) => (
               <li key={partner.name} className="text-sm text-muted-foreground">
@@ -423,7 +426,7 @@ function Results({ result }: { result: Recommendation }) {
       ) : null}
 
       {result.routing_disclosure ? (
-        <p className="flex gap-2 rounded-lg border border-border bg-muted/40 p-4 text-xs leading-relaxed text-muted-foreground">
+        <p className="flex gap-2 rounded-xl bg-muted/50 p-4 text-xs leading-relaxed text-muted-foreground">
           <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
           {result.routing_disclosure}
         </p>
@@ -436,7 +439,7 @@ function Figure({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg bg-muted/60 px-3 py-2.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 font-display text-lg font-bold tabular-nums">
+      <dd className="mt-0.5 font-display text-[1.125rem] font-normal tabular-nums">
         {value}
       </dd>
     </div>
@@ -456,8 +459,8 @@ function PlainBlock({ title, body }: { title: string; body: string }) {
   const [, ...rest] = lines;
 
   return (
-    <section className="rounded-xl border border-border bg-card p-5">
-      <h2 className="font-display text-lg font-bold">{title}</h2>
+    <section className="card-quiet p-5 sm:p-6">
+      <h2 className="font-display text-[1.125rem] font-normal">{title}</h2>
       <ul className="mt-3 space-y-1.5">
         {rest.map((line, index) => (
           <li key={index} className="text-sm leading-relaxed text-muted-foreground">

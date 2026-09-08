@@ -1,34 +1,66 @@
 /**
- * The mark is a milestone on a road: "sarathi" is a charioteer, and the product
- * is the one who knows the way. Drawn rather than imported so it stays crisp at
- * 20px on a cheap phone.
+ * The mark and the wordmark.
+ *
+ * "Sarathi" is a charioteer — the one who knows the road. So the mark is a sun
+ * coming up over a road that runs to the horizon: the same sunrise the pages
+ * are washed in, at 20px. Drawn rather than imported so it stays crisp on a
+ * cheap screen, and built from two shapes so it survives being that small.
+ *
+ * A chariot wheel would have been the obvious choice and is deliberately not
+ * used: at this size it is indistinguishable from the Ashoka Chakra, and this
+ * product must never look like it is claiming to be the government itself.
  */
-export function Logo({ className }: { className?: string }) {
+export function LogoMark({ className }: { className?: string }) {
   return (
-    <span className={`flex items-center gap-2.5 ${className ?? ""}`}>
-      <svg
-        viewBox="0 0 32 32"
-        className="size-8 shrink-0"
-        aria-hidden="true"
-        fill="none"
-      >
-        <rect width="32" height="32" rx="9" fill="var(--primary)" />
-        <path
-          d="M9 22.5 15.2 9.5a.9.9 0 0 1 1.6 0L23 22.5"
-          stroke="var(--primary-foreground)"
-          strokeWidth="2.1"
-          strokeLinecap="round"
-        />
-        <path d="M12.4 18.2h7.2" stroke="var(--gold)" strokeWidth="2.1" strokeLinecap="round" />
-      </svg>
-      <span className="flex flex-col leading-none">
-        <span className="font-display text-lg font-bold tracking-tight text-foreground">
-          Avsarathi
-        </span>
-        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-          अवसर + सारथी
-        </span>
+    <svg
+      viewBox="0 0 32 32"
+      className={className ?? "size-7"}
+      aria-hidden="true"
+      fill="none"
+    >
+      <circle cx="16" cy="12.5" r="5.2" fill="var(--gold)" />
+      <path
+        d="M4 22.5h24"
+        stroke="var(--primary)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M10.5 27.5h11"
+        stroke="var(--primary)"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        opacity="0.4"
+      />
+    </svg>
+  );
+}
+
+/**
+ * The header lockup: the name, then the two Hindi words it is built from.
+ *
+ * Set light and tight, like every other heading on the site. The Devanagari
+ * gloss is not decoration — "अवसर + सारथी", opportunity and the one who drives
+ * you to it, is the whole product in two words, and for most of this audience
+ * it is the half of the lockup they can actually read.
+ */
+export function Logo({
+  className,
+  showGloss = true,
+}: {
+  className?: string;
+  showGloss?: boolean;
+}) {
+  return (
+    <span className={`flex items-baseline gap-2.5 ${className ?? ""}`}>
+      <span className="font-display text-[1.3125rem] font-medium tracking-[-0.03em] text-foreground">
+        Avsarathi
       </span>
+      {showGloss ? (
+        <span className="hidden text-[0.8125rem] text-faint sm:inline">
+          अवसारथी
+        </span>
+      ) : null}
     </span>
   );
 }

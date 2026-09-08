@@ -1,200 +1,152 @@
-import {
-  ArrowRight,
-  BadgeCheck,
-  Banknote,
-  Calculator,
-  FileSearch,
-  MapPin,
-  MessageCircle,
-  ShieldCheck,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import { CategoryGrid } from "@/components/category-grid";
+import { Marked } from "@/components/marked";
+import { Ornament } from "@/components/ornament";
+import { ScrollCue } from "@/components/scroll-cue";
+import { WhatsAppDoor, WhatsAppQrPanel } from "@/components/whatsapp-door";
 import { ButtonLink } from "@/components/ui/button-link";
 import { getCatalogMeta } from "@/lib/api";
-import { formatNumber, LANGS } from "@/lib/i18n";
+import { formatNumber } from "@/lib/i18n";
 import { getLang } from "@/lib/i18n/server";
 import { translator } from "@/lib/i18n";
 
-const STEPS = [
-  { icon: FileSearch, title: "home.step1.title", body: "home.step1.body" },
-  { icon: BadgeCheck, title: "home.step2.title", body: "home.step2.body" },
-  { icon: MapPin, title: "home.step3.title", body: "home.step3.body" },
-] as const;
-
-const DIFFERENCES = [
-  { icon: ShieldCheck, title: "home.diff1.title", body: "home.diff1.body" },
-  { icon: Calculator, title: "home.diff2.title", body: "home.diff2.body" },
-  { icon: Banknote, title: "home.diff3.title", body: "home.diff3.body" },
-  { icon: MessageCircle, title: "home.diff4.title", body: "home.diff4.body" },
-] as const;
+type T = ReturnType<typeof translator>;
 
 export default async function HomePage() {
   const [meta, lang] = await Promise.all([getCatalogMeta(), getLang()]);
   const t = translator(lang);
-  const schemeCount = meta.total || 4736;
-  const stateCount = meta.states.filter((s) => s.name !== "All").length || 36;
-  const count = formatNumber(lang, schemeCount);
+  const count = formatNumber(lang, meta.total || 4736);
 
   return (
     <>
-      {/* ---------------------------------------------------------------- Hero */}
-      <section className="relative overflow-hidden border-b border-border">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--secondary),transparent_60%)]"
-        />
-        <div className="relative mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
-          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <p className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
-                <span className="size-1.5 rounded-full bg-gold" />
-                {t("home.badge")}
-              </p>
+      {/* ---------------------------------------------------------------- Hero
+          Centred, light and unhurried. The whole composition is one column so
+          it reads identically at 380px and 1400px — this page is opened on a
+          phone far more often than it is opened on anything else. */}
+      {/* Left-aligned on a phone, centred from `sm` up. Centring a headline, a
+          lede and an eyebrow on the same narrow measure gives all three the
+          same silhouette, and the page arrives as one block of centred text
+          with no way in. Ranged left, the size ramp does the work instead. */}
+      <section className="mx-auto flex min-h-[calc(100svh-4rem)] max-w-6xl flex-col justify-center px-5 pt-10 pb-28 text-start sm:px-6 sm:pb-32 sm:text-center">
+        <Ornament className="h-5 w-36 opacity-70 sm:mx-auto sm:h-6 sm:w-44 sm:opacity-75" />
 
-              <h1 className="mt-6 text-balance font-display text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl">
-                {t("home.h1.line1")}
-                <br />
-                <span className="text-primary">{t("home.h1.line2")}</span>
-              </h1>
+        <p className="mt-6 text-[0.8125rem] font-medium text-leaf sm:text-sm">
+          {t("home.eyebrow")}
+        </p>
 
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-                {t("home.lede", { count })}
-              </p>
+        <h1 className="mt-3 text-balance text-[2.625rem] sm:mx-auto sm:mt-5 sm:max-w-[20ch] sm:text-[3.25rem] lg:text-[4.125rem]">
+          <Marked text={t("home.h1")} />
+        </h1>
 
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <ButtonLink href="/check" size="lg" className="h-12 px-6 text-base">
-                  {t("home.cta.primary")}
-                  <ArrowRight className="size-4" />
-                </ButtonLink>
-                <ButtonLink
-                  href="/schemes"
-                  size="lg"
-                  variant="outline"
-                  className="h-12 bg-card px-6 text-base"
-                >
-                  {t("home.cta.secondary")}
-                </ButtonLink>
-              </div>
+        <p className="mt-5 max-w-[42ch] text-[1rem] leading-relaxed text-muted-foreground sm:mx-auto sm:mt-6 sm:max-w-[56ch] sm:text-lg">
+          {t("home.lede", { count })}
+        </p>
 
-              <p className="mt-4 text-sm text-muted-foreground">
-                {t("home.reassurance")}
-              </p>
-            </div>
+        <div className="mt-8 flex flex-col items-stretch gap-2.5 sm:mt-9 sm:flex-row sm:items-center sm:justify-center sm:gap-3">
+          <ButtonLink href="/check" size="pill-lg" className="font-medium">
+            {t("home.cta.primary")}
+            <ArrowRight className="size-4" />
+          </ButtonLink>
+          <WhatsAppDoor size="pill-lg" />
+        </div>
 
-            <MatchPreview t={t} />
-          </div>
+        <p className="mt-5 text-[0.8125rem] leading-relaxed text-faint">
+          {t("home.reassurance")}
+        </p>
+      </section>
+
+      {/* --------------------------------------------------------------- Proof
+          Not a card. A card here would sit on the page like a dashboard widget
+          dropped into a poster — which is exactly what it looked like before.
+          It is a ruled record instead: hairlines, tabular figures, air, and
+          nothing boxed inside anything else. */}
+      <ProofRecord t={t} />
+      <ScrollCue />
+
+      {/* ------------------------------------------------------------- Sources */}
+      <section className="mx-auto max-w-6xl px-5 pt-20 pb-4 text-center sm:px-6 sm:pt-24">
+        <p className="meta">{t("home.sources")}</p>
+        <ul className="mt-5 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 font-display text-base font-normal text-faint">
+          {["NSFDC", "NBCFDC", "NSKFDC", "myScheme", "MoSJE"].map((name) => (
+            <li key={name}>{name}</li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ----------------------------------------------------------- The asking */}
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6 sm:py-28">
+        <header className="mx-auto max-w-[62ch] text-center">
+          <h2 className="text-[1.75rem] sm:text-[2.5rem]">{t("home.ask.h2")}</h2>
+          <p className="mt-4 text-[1.0625rem] leading-relaxed text-muted-foreground">
+            {t("home.ask.lede")}
+          </p>
+        </header>
+        <ConversationPreview t={t} />
+        <div className="mt-8 flex justify-center">
+          <ButtonLink href="/chat" variant="outline" size="pill" className="bg-card">
+            {t("home.ask.cta")}
+            <ArrowRight className="size-4" />
+          </ButtonLink>
         </div>
       </section>
 
-      {/* ------------------------------------------------------------- Numbers */}
-      <section className="border-b border-border bg-card">
-        <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-px bg-border sm:grid-cols-4">
-          {[
-            { value: count, label: t("home.stat.schemes") },
-            { value: formatNumber(lang, meta.categories.length || 15), label: t("home.stat.categories") },
-            { value: formatNumber(lang, stateCount), label: t("home.stat.states") },
-            { value: formatNumber(lang, LANGS.length), label: t("home.stat.languages") },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-card px-4 py-8 text-center">
-              <dt className="font-display text-3xl font-bold text-primary sm:text-4xl">
-                {stat.value}
-              </dt>
-              <dd className="mt-1 text-sm text-muted-foreground">{stat.label}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
-
-      {/* --------------------------------------------------------- How it works */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <h2 className="font-display text-3xl font-bold sm:text-4xl">
-          {t("home.steps.h2")}
-        </h2>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {STEPS.map((step, index) => (
-            <div key={step.title} className="card-quiet p-6">
-              <div className="flex items-center gap-3">
-                <span className="flex size-10 items-center justify-center rounded-lg bg-secondary text-primary">
-                  <step.icon className="size-5" />
-                </span>
-                <span className="font-display text-sm font-semibold text-muted-foreground">
-                  {t("home.step")} {index + 1}
-                </span>
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">{t(step.title)}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {t(step.body)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------- Categories */}
-      <section className="border-y border-border bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-2xl">
-              <h2 className="font-display text-3xl font-bold sm:text-4xl">
-                {t("home.categories.h2")}
-              </h2>
-              <p className="mt-3 text-muted-foreground">
-                {t("home.categories.lede")}
-              </p>
-            </div>
-            <ButtonLink
-              href="/schemes"
-              variant="outline"
-              className="h-10 bg-paper px-4"
-            >
-              {t("home.categories.cta", { count })}
+      {/* ------------------------------------------------------------ Categories */}
+      <section className="border-t border-border bg-card/60">
+        <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 sm:py-24">
+          <header className="mx-auto max-w-[62ch] text-center">
+            <h2 className="text-[1.75rem] sm:text-[2.5rem]">{t("home.cats.h2")}</h2>
+            <p className="mt-4 text-[1.0625rem] leading-relaxed text-muted-foreground">
+              {t("home.cats.lede")}
+            </p>
+          </header>
+          <CategoryGrid categories={meta.categories} className="mt-12" />
+          <div className="mt-10 flex justify-center">
+            <ButtonLink href="/schemes" variant="outline" size="pill" className="bg-card">
+              {t("home.cats.cta", { count })}
               <ArrowRight className="size-4" />
             </ButtonLink>
           </div>
-          <CategoryGrid categories={meta.categories} className="mt-10" />
         </div>
       </section>
 
-      {/* --------------------------------------------------------- Differences */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-        <h2 className="font-display text-3xl font-bold sm:text-4xl">
-          {t("home.diff.h2")}
-        </h2>
-        <div className="mt-10 grid gap-6 sm:grid-cols-2">
-          {DIFFERENCES.map((item) => (
-            <div key={item.title} className="flex gap-4 rounded-xl border border-border bg-card p-6">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-gold-soft text-gold-ink">
-                <item.icon className="size-5" />
-              </span>
-              <div>
-                <h3 className="text-lg font-semibold">{t(item.title)}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {t(item.body)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- CTA */}
-      <section className="border-t border-border bg-primary text-primary-foreground">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-          <div className="flex flex-col items-start justify-between gap-8 lg:flex-row lg:items-center">
-            <div className="max-w-2xl">
-              <h2 className="font-display text-3xl font-bold sm:text-4xl">
-                {t("home.final.h2")}
+      {/* -------------------------------------------------------------- WhatsApp */}
+      <section className="mx-auto max-w-6xl px-5 py-20 sm:px-6 sm:py-24">
+        <div className="relative overflow-hidden rounded-[1.75rem] bg-forest-deep px-7 py-11 text-[#dcede4] sm:px-12 sm:py-14">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_88%_18%,rgba(122,222,168,0.14),transparent_62%)]"
+          />
+          <div className="relative flex flex-col items-start gap-9 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-[46ch]">
+              <h2 className="text-[1.75rem] text-white sm:text-[2.125rem]">
+                {t("home.wa.h2")}
               </h2>
-              <p className="mt-3 text-primary-foreground/80">
-                {t("home.final.body")}
+              <p className="mt-4 text-[0.9375rem] leading-relaxed text-[#9ebfb0] sm:text-base">
+                {t("home.wa.body")}
               </p>
+              <WhatsAppDoor
+                size="pill-lg"
+                variant="soft"
+                className="mt-7 bg-[#7adea8] text-[#052b1b] hover:bg-[#6cd39c]"
+              />
             </div>
-            <ButtonLink
-              href="/check"
-              size="lg"
-              className="h-12 bg-gold px-8 text-base font-semibold text-gold-ink hover:bg-gold/90"
-            >
+            <WhatsAppQrPanel className="shrink-0 self-center lg:self-auto" />
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------------ CTA */}
+      <section className="border-t border-border">
+        <div className="mx-auto max-w-6xl px-5 py-20 text-center sm:px-6 sm:py-24">
+          <h2 className="mx-auto max-w-[18ch] text-[1.75rem] sm:text-[2.5rem]">
+            {t("home.final.h2")}
+          </h2>
+          <p className="mx-auto mt-4 max-w-[56ch] text-[1.0625rem] leading-relaxed text-muted-foreground">
+            {t("home.final.body")}
+          </p>
+          <div className="mt-8 flex justify-center">
+            <ButtonLink href="/check" size="pill-lg" className="font-medium">
               {t("home.final.cta")}
               <ArrowRight className="size-4" />
             </ButtonLink>
@@ -206,64 +158,119 @@ export default async function HomePage() {
 }
 
 /**
- * A real result, rendered statically. It shows the shape of the answer — a
- * verdict, the reason for it, and the money — before anyone has typed anything.
- * The figures are the ones the engine actually produces for this profile.
+ * One real result, before anyone has typed anything.
+ *
+ * The figures are the ones the engine actually produces for this profile, and
+ * the number given the most room is not the loan — it is what the loan saves
+ * against the moneylender. That difference is the entire argument this product
+ * makes, so it is set at display size and everything else is set around it.
  */
-function MatchPreview({ t }: { t: ReturnType<typeof translator> }) {
+function ProofRecord({ t }: { t: T }) {
   return (
-    <div className="card-quiet overflow-hidden">
-      <div className="flex items-center justify-between border-b border-border bg-muted/60 px-5 py-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          Sunita · Ballia, UP · SC · ₹2.8L
-        </p>
-        <span className="rounded-full bg-verified-soft px-2.5 py-1 text-xs font-semibold text-verified">
-          {t("home.preview.matches")}
-        </span>
-      </div>
+    <section className="mx-auto max-w-5xl px-5 sm:px-6">
+      <div className="border-t border-border pt-10">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <p className="text-[0.8125rem] text-faint">{t("home.proof.who")}</p>
+          <p className="rounded-full bg-mint px-3 py-1 text-[0.8125rem] font-medium text-leaf">
+            {t("home.proof.matched")}
+          </p>
+        </div>
 
-      <div className="divide-y divide-border">
-        <div className="px-5 py-4">
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="font-semibold leading-snug">Micro Finance Scheme</h3>
-            <span className="shrink-0 rounded-md bg-gold-soft px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gold-ink">
-              {t("home.preview.cheapest")}
-            </span>
+        <div className="mt-9 grid gap-x-14 gap-y-12 md:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <h2 className="font-display text-[1.625rem] font-normal tracking-[-0.02em] sm:text-[1.875rem]">
+              Micro Finance Scheme
+            </h2>
+            <p className="mt-1.5 text-[0.9375rem] text-muted-foreground">
+              {t("home.proof.terms")}
+            </p>
+
+            <dl className="mt-8">
+              {[
+                { k: t("home.proof.quarter"), v: "₹12,568", tone: "" },
+                { k: t("home.proof.interest"), v: "₹17,272", tone: "" },
+                { k: t("home.proof.moneylender"), v: "₹1,08,000", tone: "text-clay" },
+              ].map((row) => (
+                <div
+                  key={row.k}
+                  className={`flex items-baseline justify-between gap-6 border-t border-border py-3.5 text-[0.9375rem] ${row.tone}`}
+                >
+                  <dt>{row.k}</dt>
+                  <dd className="tnum shrink-0 font-medium">{row.v}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {t("home.preview.terms")}
-          </p>
-          <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg bg-muted/60 px-3 py-2">
-              <dt className="text-xs text-muted-foreground">{t("home.preview.perQuarter")}</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums">₹12,568</dd>
+
+          <div>
+            <p className="meta">{t("home.proof.keepLabel")}</p>
+            <p className="tnum mt-2 font-display text-[2.75rem] font-light leading-none tracking-[-0.03em] text-leaf">
+              ₹90,728
+            </p>
+            <p className="mt-3.5 text-[0.9375rem] leading-relaxed text-muted-foreground">
+              {t("home.proof.keepBody")}
+            </p>
+            <div className="mt-6 border-t border-border pt-5">
+              <p className="meta">{t("home.proof.whereLabel")}</p>
+              <p className="mt-2 text-[0.9375rem] leading-relaxed">
+                {t("home.proof.whereBody")}
+              </p>
             </div>
-            <div className="rounded-lg bg-muted/60 px-3 py-2">
-              <dt className="text-xs text-muted-foreground">{t("home.preview.interest")}</dt>
-              <dd className="mt-0.5 font-semibold tabular-nums">₹17,272</dd>
-            </div>
+          </div>
+        </div>
+
+        <p className="mt-12 border-t border-border pt-5 text-[0.8125rem] text-faint">
+          {t("home.proof.caption")}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * What the assistant looks like when it answers.
+ *
+ * Shown rather than described, because "ask in your own language" is a claim
+ * and a Hindi question with a rupee table under it is evidence. The figures
+ * repeat the ones above on purpose: the same loan, the same answer, whichever
+ * door you came in through.
+ */
+function ConversationPreview({ t }: { t: T }) {
+  return (
+    <div className="card-quiet mx-auto mt-12 max-w-3xl overflow-hidden">
+      <div className="flex flex-col gap-4 p-5 sm:p-7">
+        <p className="max-w-[85%] self-end rounded-[1.125rem] rounded-ee-md bg-primary px-4 py-3 text-[0.9375rem] leading-relaxed text-primary-foreground sm:max-w-[70%]">
+          {t("home.ask.q")}
+        </p>
+
+        <div className="max-w-full self-start">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-verified-soft px-3 py-1 text-[0.75rem] font-semibold text-verified">
+            {t("home.ask.badge")}
+          </span>
+          <p className="mt-3 text-[0.9375rem] leading-relaxed">{t("home.ask.a")}</p>
+
+          <dl className="mt-4 overflow-hidden rounded-xl border border-border">
+            <p className="meta border-b border-border bg-muted/60 px-4 py-2.5">
+              {t("home.ask.card")}
+            </p>
+            {[
+              { k: t("home.ask.instalment"), v: "₹12,568", tone: "" },
+              { k: t("home.ask.interest"), v: "₹17,272", tone: "" },
+              {
+                k: t("home.ask.moneylender"),
+                v: "₹1,08,000",
+                tone: "bg-clay-soft text-clay",
+              },
+            ].map((row) => (
+              <div
+                key={row.k}
+                className={`flex items-baseline justify-between gap-4 border-b border-border px-4 py-3 text-[0.9375rem] last:border-b-0 ${row.tone}`}
+              >
+                <dt>{row.k}</dt>
+                <dd className="tnum shrink-0 font-medium">{row.v}</dd>
+              </div>
+            ))}
           </dl>
-        </div>
-
-        <div className="bg-caution-soft px-5 py-4">
-          <p className="text-sm font-semibold text-caution">
-            {t("home.preview.moneylender")}
-          </p>
-          <p className="mt-1 text-sm text-caution/90">
-            {t("home.preview.sixTimes")}
-          </p>
-        </div>
-
-        <div className="px-5 py-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            {t("home.preview.whereToGo")}
-          </p>
-          <p className="mt-2 text-sm font-medium">
-            UP Scheduled Castes Finance &amp; Development Corporation
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {t("home.preview.office")}
-          </p>
         </div>
       </div>
     </div>

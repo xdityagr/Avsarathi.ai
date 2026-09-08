@@ -37,7 +37,7 @@ export default async function NotFound() {
           variant="outline"
           className="h-11 bg-card px-6"
         >
-          {t("home.cta.secondary")}
+          {t("nav.schemes")}
         </ButtonLink>
       </div>
 

@@ -25,10 +25,13 @@ export function LanguageSwitcher({ className }: { className?: string }) {
         aria-haspopup="listbox"
         aria-label={t("lang.change")}
         disabled={switching}
-        className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-sm font-medium transition-colors hover:bg-accent disabled:opacity-60"
+        /* Quiet on purpose. There is one button in the header and it is "find
+           my schemes"; a second pill beside it makes the reader choose between
+           two things that are not comparable. */
+        className="flex h-9 items-center gap-1.5 rounded-full px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-60"
       >
-        <Languages className="size-4 text-muted-foreground" />
-        <span>{LANGUAGE_META[lang].native}</span>
+        <Languages className="size-4" />
+        <span className="hidden sm:inline">{LANGUAGE_META[lang].native}</span>
       </button>
 
       {open ? (
@@ -42,7 +45,7 @@ export function LanguageSwitcher({ className }: { className?: string }) {
           />
           <ul
             role="listbox"
-            className="absolute right-0 z-50 mt-2 w-44 overflow-hidden rounded-lg border border-border bg-card py-1 shadow-lg"
+            className="absolute end-0 z-50 mt-2 max-h-[70vh] w-48 overflow-y-auto rounded-2xl border border-border bg-card py-1.5 shadow-[0_1px_2px_rgb(28_26_23/0.04),0_24px_56px_-24px_rgb(28_26_23/0.28)]"
           >
             {(LANGS as readonly Lang[]).map((code) => (
               <li key={code}>
@@ -56,8 +59,8 @@ export function LanguageSwitcher({ className }: { className?: string }) {
                     setOpen(false);
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between px-3 py-2.5 text-left text-sm hover:bg-accent",
-                    code === lang && "font-semibold text-primary",
+                    "flex w-full items-center justify-between px-3.5 py-2.5 text-start text-sm transition-colors hover:bg-accent",
+                    code === lang && "font-medium text-primary",
                   )}
                 >
                   <span>{LANGUAGE_META[code].native}</span>

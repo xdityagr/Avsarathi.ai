@@ -63,7 +63,7 @@ export default async function ResultsPage({
   } catch {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center">
-        <h1 className="font-display text-2xl font-bold">
+        <h1 className="font-display text-[1.5rem] font-normal">
           We could not run the match just now
         </h1>
         <p className="mt-3 text-muted-foreground">
@@ -96,7 +96,7 @@ export default async function ResultsPage({
         {/* The headline is the targeted count, not the total. A scheme that
             restricts nobody matches everybody, so "664 matches" is true and
             useless; "41 are meant for you" is the number worth acting on. */}
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">
+        <h1 className="font-display text-[2rem] font-light sm:text-4xl">
           {result.total_targeted > 0 ? (
             <>
               {result.total_targeted.toLocaleString("en-IN")}{" "}
@@ -148,7 +148,7 @@ export default async function ResultsPage({
           </ul>
 
           {result.total_matched > matches.length ? (
-            <p className="mt-8 rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            <p className="mt-8 card-quiet p-5 sm:p-6 text-sm text-muted-foreground">
               Showing the {matches.length} strongest of{" "}
               {result.total_matched.toLocaleString("en-IN")} matches. Answering
               one or two more questions is the fastest way to shorten this list —
@@ -160,7 +160,7 @@ export default async function ResultsPage({
 
       {result.not_matched.length > 0 ? (
         <section className="mt-12">
-          <h2 className="font-display text-xl font-bold">
+          <h2 className="font-display text-[1.25rem] font-normal">
             Ruled out, and why
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -211,18 +211,18 @@ function FocusVerdict({
   return (
     <section
       className={`mt-6 rounded-xl border p-6 ${
-        blocked ? "border-caution/40 bg-caution-soft" : "border-verified/40 bg-verified-soft"
+        blocked ? "border-clay/30 bg-clay-soft" : "border-verified/40 bg-verified-soft"
       }`}
     >
       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
         {tr("results.focus.title")}
       </p>
-      <h2 className="mt-2 font-display text-2xl font-bold">
+      <h2 className="mt-2 font-display text-[1.5rem] font-normal">
         <Link href={`/schemes/${verdict.slug}`} className="hover:underline">
           {verdict.name}
         </Link>
       </h2>
-      <p className={`mt-1 font-medium ${blocked ? "text-caution" : "text-verified"}`}>
+      <p className={`mt-1 font-medium ${blocked ? "text-clay" : "text-verified"}`}>
         {blocked
           ? `${tr("results.notMatchedOn")} ${verdict.unmet.join(", ")}`
           : tr(verdict.verdict === "CHECK" ? "results.strength.check" : "results.strength.likely")}
@@ -237,8 +237,8 @@ function FocusVerdict({
         ))}
         {verdict.unmet.map((item) => (
           <div key={item} className="flex items-center gap-2">
-            <AlertCircle className="size-4 shrink-0 text-caution" />
-            <dt className="font-medium text-caution">{item}</dt>
+            <AlertCircle className="size-4 shrink-0 text-clay" />
+            <dt className="font-medium text-clay">{item}</dt>
           </div>
         ))}
         {verdict.unknown.map((item) => (
@@ -272,7 +272,7 @@ function Tally({
     <span
       className={`inline-flex items-baseline gap-2 rounded-lg px-3 py-2 text-sm font-medium ${tones[tone]}`}
     >
-      <span className="font-display text-lg font-bold tabular-nums">{count}</span>
+      <span className="font-display text-[1.125rem] font-normal tabular-nums">{count}</span>
       {label}
     </span>
   );
@@ -333,8 +333,8 @@ function MatchCard({ match }: { match: DiscoveryMatch }) {
 
 function NoMatches() {
   return (
-    <div className="mt-10 rounded-xl border border-dashed border-border p-10 text-center">
-      <h2 className="font-display text-xl font-bold">
+    <div className="mt-10 rounded-2xl border border-dashed border-input p-12 text-center">
+      <h2 className="font-display text-[1.25rem] font-normal">
         Nothing matched every answer
       </h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
@@ -343,7 +343,7 @@ function NoMatches() {
         than per year. Change one answer and the list will almost certainly fill.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <ButtonLink href="/check" className="h-11 px-5">
+        <ButtonLink href="/check" className="h-11 rounded-full px-5">
           Change my answers
         </ButtonLink>
         <ButtonLink

@@ -29,7 +29,8 @@ export function ChatLauncher() {
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 h-12 gap-2 rounded-full px-5 shadow-lg"
+        size="pill"
+        className="fixed bottom-5 end-5 z-40 shadow-[0_10px_30px_-10px_rgba(20,64,47,0.55)]"
         aria-label={t("chat.title")}
       >
         <MessageCircle className="size-4" />
@@ -39,7 +40,7 @@ export function ChatLauncher() {
       {open ? (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div
-            className="absolute inset-0 bg-foreground/20"
+            className="absolute inset-0 bg-foreground/15 backdrop-blur-[2px]"
             aria-hidden
             onClick={() => setOpen(false)}
           />
@@ -47,18 +48,21 @@ export function ChatLauncher() {
             role="dialog"
             aria-modal="true"
             aria-label={t("chat.title")}
-            className="relative flex h-full w-full max-w-md flex-col border-l border-border bg-paper shadow-xl"
+            className="relative flex h-full w-full max-w-md flex-col border-s border-border bg-paper shadow-[0_0_60px_-12px_rgba(28,26,23,0.3)]"
           >
-            <header className="flex items-center justify-between border-b border-border px-4 py-3">
+            <header className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
-                <h2 className="font-display text-base font-bold">{t("chat.title")}</h2>
-                <p className="text-xs text-muted-foreground">
+                <h2 className="font-display text-[1.0625rem] font-normal tracking-[-0.02em]">
+                  {t("chat.title")}
+                </h2>
+                <p className="mt-0.5 text-[0.8125rem] text-muted-foreground">
                   {t("chat.subtitle")}
                 </p>
               </div>
               <Button
                 variant="ghost"
-                size="icon"
+                size="pill-icon"
+                className="size-9"
                 onClick={() => setOpen(false)}
                 aria-label={t("nav.menu.close")}
               >
