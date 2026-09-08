@@ -53,6 +53,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import logging
+import re
 import zlib
 from dataclasses import dataclass
 from pathlib import Path
@@ -189,14 +190,56 @@ def _decompress(raw: bytes) -> bytes:
     raise AadhaarQrError("could not decompress the QR payload")
 
 
+#: Cards issued from about 2022 begin with a version marker — "V2", "V3" — and
+#: older ones go straight into the email/mobile indicator. One extra field at
+#: the front shifts EVERY later field by one, which does not fail: it fills the
+#: form with the neighbouring value. A real card read back a reference id as
+#: the person's name and the gender as their father's name.
+_VERSION_MARKER = re.compile(rb"^V\d+$", re.IGNORECASE)
+
+#: The reference id is the last four Aadhaar digits followed by a timestamp, so
+#: it is long and entirely numeric — the one field whose shape identifies it,
+#: and therefore the anchor everything else is measured from.
+_REFERENCE_ID = re.compile(rb"^\d{12,}$")
+
+
+def _leading_offset(parts: list[bytes]) -> int:
+    """How many fields sit in front of the email/mobile indicator.
+
+    Detected rather than assumed, because both layouts are in circulation and
+    a wrong guess is silent: it produces a filled form full of the wrong
+    answers, which is worse than an empty one.
+    """
+    # The anchor, when we can see it: the reference id sits immediately after
+    # the indicator, so its position tells us the whole layout.
+    for index, part in enumerate(parts[:4]):
+        if _REFERENCE_ID.match(part.strip()):
+            return max(0, index - 1)
+    # No anchor visible; fall back to looking for the version marker itself.
+    if parts and _VERSION_MARKER.match(parts[0].strip()):
+        return 1
+    return 0
+
+
 def _split_fields(data: bytes) -> tuple[dict[str, str], bytes]:
     """The delimited text fields, and everything after them.
 
-    Only the first sixteen delimiters are text. What follows is the photograph
-    and the signature, which must never be decoded as characters.
+    Only the leading text fields are characters. What follows is the
+    photograph and the signature, which must never be decoded as text.
     """
+    # One more than we need, so the offset can be detected before anything is
+    # assigned to a name.
+    probe = data.split(bytes([DELIMITER]), len(FIELD_ORDER) + 2)
+    offset = _leading_offset(probe)
+
     fields: dict[str, str] = {}
     start = 0
+    # Skip whatever sits in front of the indicator.
+    for _ in range(offset):
+        start = data.find(bytes([DELIMITER]), start) + 1
+        if start <= 0:
+            raise AadhaarQrError("the QR ended early — no fields found")
+
     for index, key in enumerate(FIELD_ORDER):
         end = data.find(bytes([DELIMITER]), start)
         if end < 0:
@@ -204,6 +247,16 @@ def _split_fields(data: bytes) -> tuple[dict[str, str], bytes]:
                 f"the QR ended early — only {index} of {len(FIELD_ORDER)} fields")
         fields[key] = data[start:end].decode("utf-8", errors="replace").strip()
         start = end + 1
+
+    # Last line of defence. If the reference id did not land on the reference
+    # id, the mapping is wrong and every value below it is somebody else's
+    # field — better to refuse than to fill a government form with it.
+    reference = fields.get("reference_id", "")
+    if reference and not reference.isdigit():
+        raise AadhaarQrError(
+            "this card's fields are not in an order we recognise — "
+            "please type the details instead")
+
     return fields, data[start:]
 
 

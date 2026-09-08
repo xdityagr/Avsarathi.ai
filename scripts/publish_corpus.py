@@ -25,6 +25,7 @@ import argparse
 import gzip
 import hashlib
 import shutil
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -58,9 +59,24 @@ def main() -> int:
 
     out = CORPUS_DB.parent / ASSET
     raw = CORPUS_DB.stat().st_size
-    print(f"Compressing {CORPUS_DB} ({raw / 1e6:.0f} MB)…")
-    with CORPUS_DB.open("rb") as src, gzip.open(out, "wb", compresslevel=6) as dst:
+
+    # A consistent snapshot, taken through SQLite rather than the filesystem.
+    # `VACUUM INTO` reads inside a transaction, so this is safe to run while an
+    # ingest is still writing — copying the file directly would capture a torn
+    # page and ship a corpus that fails to open only once it is deployed.
+    snapshot = CORPUS_DB.parent / "schemes.snapshot.db"
+    snapshot.unlink(missing_ok=True)
+    print(f"Snapshotting {CORPUS_DB} ({raw / 1e6:.0f} MB)…")
+    connection = sqlite3.connect(CORPUS_DB)
+    try:
+        connection.execute("VACUUM INTO ?", (str(snapshot),))
+    finally:
+        connection.close()
+
+    print(f"Compressing…")
+    with snapshot.open("rb") as src, gzip.open(out, "wb", compresslevel=6) as dst:
         shutil.copyfileobj(src, dst, 1024 * 1024)
+    snapshot.unlink(missing_ok=True)
     packed = out.stat().st_size
     print(f"  -> {out} ({packed / 1e6:.0f} MB, {packed / raw:.0%} of the original)")
 

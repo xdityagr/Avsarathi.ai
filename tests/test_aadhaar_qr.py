@@ -242,3 +242,49 @@ class TestProfileShape:
         mark = aadhaar_qr.fingerprint(text)
         assert len(mark) == 12
         assert mark not in text
+
+class TestVersionedCards:
+    """Cards issued from about 2022 begin with a version marker.
+
+    One extra field at the front shifts every later field by one, and the
+    failure is silent: the form fills with the neighbouring value. A real card
+    read its reference id back as the person's name and its gender as their
+    father's name, which is how this was found — not by a test.
+    """
+
+    def _versioned(self) -> str:
+        body = b"\xff".join([b"V2", *[f.encode() for f in FIELDS]]) + b"\xff"
+        return str(int.from_bytes(gzip.compress(body + PHOTO + MOBILE_HASH), "big"))
+
+    def test_a_versioned_card_reads_the_same_as_an_unversioned_one(self):
+        scanned = aadhaar_qr.scan(self._versioned())
+        assert scanned.name == "Sunita Devi"
+        assert scanned.gender == "F"
+        assert scanned.dob == "12-04-1988"
+        assert scanned.state == "Uttar Pradesh"
+
+    def test_the_reference_id_does_not_end_up_in_the_name(self):
+        """The exact symptom seen on a real card."""
+        scanned = aadhaar_qr.scan(self._versioned())
+        assert not scanned.name[:6].isdigit()
+        assert scanned.reference_id.isdigit()
+
+    def test_the_gender_does_not_end_up_as_the_parent_name(self):
+        profile = aadhaar_qr.to_profile(aadhaar_qr.scan(self._versioned()))
+        assert profile.get("parent_name") != "F"
+        assert profile.get("parent_name") == "Ram Prasad"
+
+    def test_both_layouts_give_the_same_answer(self):
+        plain = aadhaar_qr.scan(_qr_text(signed=False))
+        versioned = aadhaar_qr.scan(self._versioned())
+        for field in ("name", "dob", "gender", "district", "state", "pincode"):
+            assert getattr(plain, field) == getattr(versioned, field), field
+
+    def test_a_layout_we_cannot_place_is_refused(self):
+        """Rather than filling a government form with somebody else's fields."""
+        scrambled = b"\xff".join(
+            [b"junk", b"more junk", *[f.encode() for f in FIELDS[2:]]]) + b"\xff"
+        text = str(int.from_bytes(
+            gzip.compress(scrambled + PHOTO + MOBILE_HASH), "big"))
+        with pytest.raises(aadhaar_qr.AadhaarQrError):
+            aadhaar_qr.scan(text)

@@ -181,6 +181,8 @@ export const en = {
   "schemes.filter.category": "Category",
   "schemes.filter.level": "Level",
   "schemes.filter.state": "State",
+  "schemes.filter.applied": "Narrowed by",
+  "schemes.filter.showAll": "Show all {count}",
   "schemes.filter.clear": "Clear filters",
   "schemes.none": "No schemes match those filters",
   "schemes.empty.title": "Nothing matched that.",
