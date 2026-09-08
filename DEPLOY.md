@@ -174,6 +174,28 @@ CORS, no API URL in client code.
 Also set `NEXT_PUBLIC_WHATSAPP_NUMBER` to the WhatsApp number in E.164, or the
 QR panels render a "not configured yet" placeholder.
 
+### The streaming route does not go through the proxy
+
+An assistant turn takes about twenty seconds. Vercel's Hobby plan cuts a
+response at ten, and the failure is quiet: the tool trace arrives, the answer
+never does, and the conversation looks like it stopped mid-thought. Measured
+against the deployed engine directly, the same turn completes in 19.4s.
+
+So that one route goes straight from the browser to Render. Two settings:
+
+```
+# Vercel
+NEXT_PUBLIC_AVSARATHI_STREAM_ORIGIN = https://avsarathi-api.onrender.com
+
+# Render
+AVSARATHI_ALLOWED_ORIGINS = https://your-project.vercel.app
+```
+
+Everything else still goes through the rewrite, so this is the only route with
+any CORS at all — named origins, never `*`, and no credentials, because none
+are used. Left unset locally, where the dev proxy has no such limit, the fetch
+stays relative and nothing changes.
+
 ### One risk worth testing early
 
 The assistant streams over Server-Sent Events and a turn can take 20–60

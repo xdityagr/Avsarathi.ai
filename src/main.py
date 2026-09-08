@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 import re
@@ -107,6 +108,35 @@ app = FastAPI(
 # Mount routes
 app.include_router(webhook_router)
 app.include_router(api_router)
+
+
+# ---------------------------------------------------------------------------
+# Cross-origin access, for the one route that cannot go through the proxy
+# ---------------------------------------------------------------------------
+#
+# Everything else reaches this service through the front end's rewrite, so the
+# browser sees a single origin and there is no CORS to configure. The assistant
+# stream is the exception: a turn takes about twenty seconds and Vercel's Hobby
+# plan cuts a response at ten, so the trace arrives, the answer never does, and
+# the conversation appears to stop mid-thought.
+#
+# So the browser is allowed to talk to this service directly for that route.
+# Named origins only — never "*" — and no credentials, because none are used.
+_origins = [
+    o.strip() for o in os.environ.get("AVSARATHI_ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+if _origins:
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type"],
+    )
+    logger.info("Cross-origin requests allowed from: %s", ", ".join(_origins))
 
 
 @app.get("/health")

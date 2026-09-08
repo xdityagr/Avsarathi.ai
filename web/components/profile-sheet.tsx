@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { Fragment, useState, useSyncExternalStore } from "react";
 import { Check, ScanLine, Trash2 } from "lucide-react";
 
 import { AadhaarScan, ScanResult } from "@/components/aadhaar-scan";
@@ -57,7 +57,13 @@ export function ProfileSheet({
   const [draft, setDraft] = useState<Profile>(stored);
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<
-    { verified: boolean; last4: string; filled: string[]; absent: string[] } | null
+    {
+      verified: boolean;
+      last4: string;
+      filled: string[];
+      absent: string[];
+      card: Record<string, string>;
+    } | null
   >(null);
   const [saved, setSaved] = useState(false);
 
@@ -77,13 +83,14 @@ export function ProfileSheet({
       {scanning ? (
         <AadhaarScan
           onClose={() => setScanning(false)}
-          onFilled={(fromCard, verified, last4) => {
+          onFilled={(fromCard, verified, last4, card) => {
             // The card fills what it knows and leaves the rest alone — someone
             // who already typed their income should not lose it to a scan.
             setDraft((prev) => ({ ...prev, ...fromCard }));
             setScan({
               verified,
               last4,
+              card,
               // Named, not counted. "5 of 11" leaves someone hunting for which
               // five, and a field that silently stayed empty looks like the
               // scan failing rather than the card not carrying it.
@@ -135,6 +142,30 @@ export function ProfileSheet({
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             {t("profile.scanMissing")}
           </p>
+
+          {/*
+            What the card literally says, for when a field comes back empty and
+            the question is whether the scan missed it or the card never had
+            it. Folded away because almost nobody needs it, and open in one
+            click because when you do need it, nothing else will do.
+          */}
+          {Object.keys(scan.card).length ? (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs text-muted-foreground underline-offset-4 hover:underline">
+                {t("profile.scanRaw")}
+              </summary>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                {Object.entries(scan.card).map(([key, value]) => (
+                  <Fragment key={key}>
+                    <dt className="text-muted-foreground">{key}</dt>
+                    <dd className={value ? "text-foreground" : "text-faint"}>
+                      {value || "—"}
+                    </dd>
+                  </Fragment>
+                ))}
+              </dl>
+            </details>
+          ) : null}
         </div>
       ) : null}
 

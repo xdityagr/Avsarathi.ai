@@ -69,6 +69,23 @@ const TOOL_ICONS: Record<string, typeof Search> = {
   corpus_stats: BarChart3,
 };
 
+/**
+ * Where the assistant stream is fetched from.
+ *
+ * Everything else goes through the front end's own /api rewrite, so the
+ * browser sees one origin and there is no CORS anywhere. This one route is the
+ * exception: a turn takes about twenty seconds, and a proxy that caps a
+ * response at ten delivers the trace and then silently drops the answer — the
+ * conversation appears to stop mid-thought, which is exactly what it looked
+ * like.
+ *
+ * Set NEXT_PUBLIC_AVSARATHI_STREAM_ORIGIN to the engine's own URL and the
+ * browser talks to it directly for this call. Left unset — locally, where the
+ * dev proxy has no such limit — it stays relative.
+ */
+const STREAM_ORIGIN = process.env.NEXT_PUBLIC_AVSARATHI_STREAM_ORIGIN ?? "";
+const STREAM_URL = `${STREAM_ORIGIN}/api/agent/stream`;
+
 export function ChatPanel({
   className,
   showHeading = true,
@@ -230,7 +247,7 @@ export function ChatPanel({
       let answered = false;
 
       try {
-        const response = await fetch("/api/agent/stream", {
+        const response = await fetch(STREAM_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           // The interface language, not the script the message arrived in: a

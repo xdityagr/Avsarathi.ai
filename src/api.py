@@ -793,4 +793,8 @@ async def read_aadhaar_qr(request: AadhaarQrRequest) -> dict:
         "verified": scanned.verified,
         # Shown so someone can tell which card they just scanned.
         "aadhaar_last4": scanned.aadhaar_last4,
+        # What the card literally contains, so a field that came back empty can
+        # be checked against the card rather than argued about. Their own data,
+        # returned to them, stored nowhere.
+        "card": scanned.raw_fields,
     }

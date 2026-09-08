@@ -55,7 +55,7 @@ import hashlib
 import logging
 import re
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
@@ -122,6 +122,13 @@ class ScannedAadhaar:
     verified: bool = False
     """Why it did not verify, when it did not. Shown to nobody but the logs."""
     verify_note: str = ""
+    """Every text field, exactly as the card wrote it.
+
+    Kept so that "it did not fill my date of birth" can be answered with what
+    the card actually says rather than with a theory. Returned to the person
+    who scanned their own card and stored nowhere — it is the same data as the
+    fields above, differently arranged."""
+    raw_fields: dict = field(default_factory=dict)
 
     @property
     def aadhaar_last4(self) -> str:
@@ -326,6 +333,7 @@ def scan(qr_text: str, cert_pem: Optional[bytes] = None) -> ScannedAadhaar:
         reference_id=fields.get("reference_id", ""),
         verified=verified,
         verify_note=note,
+        raw_fields=dict(fields),
     )
     logger.info("Scanned an Aadhaar QR (verified=%s, %s)", verified, note)
     return scanned

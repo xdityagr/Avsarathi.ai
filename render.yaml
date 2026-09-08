@@ -41,6 +41,13 @@ services:
       - key: AVSARATHI_STATE_DIR
         value: /data
 
+      # The one route the browser reaches directly. An agent turn takes about
+      # twenty seconds and Vercel's Hobby plan cuts a response at ten, so the
+      # trace arrived and the answer never did. Set this to the Vercel origin,
+      # comma-separated if there is more than one. Named origins only.
+      - key: AVSARATHI_ALLOWED_ORIGINS
+        sync: false
+
       # ---- secrets: set these in the Render dashboard, not here ---------
       - key: GEMINI_API_KEY
         sync: false

@@ -75,7 +75,12 @@ export function AadhaarScan({
   onFilled,
   onClose,
 }: {
-  onFilled: (profile: Profile, verified: boolean, last4: string) => void;
+  onFilled: (
+    profile: Profile,
+    verified: boolean,
+    last4: string,
+    card: Record<string, string>,
+  ) => void;
   onClose: () => void;
 }) {
   const { t } = useLanguage();
@@ -120,7 +125,8 @@ export function AadhaarScan({
         const data = await response.json();
         stop();
         setPhase("done");
-        onFilled(data.profile ?? {}, Boolean(data.verified), data.aadhaar_last4 ?? "");
+        onFilled(data.profile ?? {}, Boolean(data.verified),
+                 data.aadhaar_last4 ?? "", data.card ?? {});
       } catch {
         setError(t("aadhaar.failed"));
         setPhase("scanning");
