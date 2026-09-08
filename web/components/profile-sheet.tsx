@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  NEVER_ON_A_CARD,
   PROFILE_FIELDS,
   clearProfile,
   profileFilled,
@@ -56,7 +57,7 @@ export function ProfileSheet({
   const [draft, setDraft] = useState<Profile>(stored);
   const [scanning, setScanning] = useState(false);
   const [scan, setScan] = useState<
-    { verified: boolean; last4: string; filled: string[] } | null
+    { verified: boolean; last4: string; filled: string[]; absent: string[] } | null
   >(null);
   const [saved, setSaved] = useState(false);
 
@@ -89,6 +90,14 @@ export function ProfileSheet({
               filled: PROFILE_FIELDS
                 .filter(({ key }) => (fromCard as Record<string, unknown>)[key])
                 .map(({ labelKey }) => t(labelKey as StringKey)),
+              // Blank, but the card COULD have carried it — as opposed to the
+              // three that no card ever does. Only this list is worth a
+              // second look at the scan; the others are just facts.
+              absent: PROFILE_FIELDS
+                .filter(({ key }) =>
+                  !(fromCard as Record<string, unknown>)[key] &&
+                  !NEVER_ON_A_CARD.includes(key))
+                .map(({ labelKey }) => t(labelKey as StringKey)),
             });
             setScanning(false);
           }}
@@ -114,11 +123,15 @@ export function ProfileSheet({
             </p>
           ) : null}
           {/*
-            Said outright, because its absence looks like a bug. UIDAI puts
-            only a SHA-256 hash of the mobile number in the QR, never the
-            number — so this one can never be filled from a card, however
-            good the scan was.
+            A card that simply does not carry a field, versus a scan that
+            failed, have to look different — otherwise someone re-scans a
+            perfectly good card and concludes the feature is broken.
           */}
+          {scan.absent.length ? (
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              {t("profile.scanAbsent")} {scan.absent.join(", ")}.
+            </p>
+          ) : null}
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             {t("profile.scanMissing")}
           </p>

@@ -331,6 +331,11 @@ def scan(qr_text: str, cert_pem: Optional[bytes] = None) -> ScannedAadhaar:
     return scanned
 
 
+#: S/O, D/O, W/O, C/O — son, daughter, wife or care of. Cards vary in
+#: case and in what follows the marker, so both are matched loosely.
+_CARE_OF_PREFIX = re.compile(r"^\s*[SDWC]\s*/\s*O\b[\s:.,\-]*", re.IGNORECASE)
+
+
 def to_profile(scanned: ScannedAadhaar) -> dict:
     """The scan, in the shape the application pack and the profile sheet use.
 
@@ -340,9 +345,12 @@ def to_profile(scanned: ScannedAadhaar) -> dict:
     """
     candidate = {
         "full_name": scanned.name,
-        "parent_name": scanned.care_of.replace("S/O", "").replace("D/O", "")
-                                     .replace("W/O", "").replace("C/O", "")
-                                     .strip(" :,"),
+        # "S/O Manish Kumar Gaur" is a relationship marker plus a name, and the
+        # form wants the name. Case-insensitive and tolerant of the separator
+        # because cards are not consistent: S/O, s/o, "S/O:", "C/O -" all
+        # occur, and a literal replace left the lowercase ones showing "s/o"
+        # in a field labelled "father's name".
+        "parent_name": _CARE_OF_PREFIX.sub("", scanned.care_of).strip(" :,-"),
         "dob": scanned.dob,
         "gender": scanned.normalised_gender,
         "address": scanned.address,

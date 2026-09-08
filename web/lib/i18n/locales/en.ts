@@ -337,4 +337,5 @@ export const en = {
   "nav.me": "About you",
   "profile.scanFilled": "Filled in from your card:",
   "profile.scanMissing": "Your mobile number is not stored in the QR code — only a scrambled version of it — so that one has to be typed. Add your category and income too; a card does not carry them.",
+  "profile.scanAbsent": "Your card did not carry:",
 } as const;

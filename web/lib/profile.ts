@@ -76,6 +76,19 @@ export const PROFILE_FIELDS: {
   { key: "income", labelKey: "profile.income", type: "number" },
 ];
 
+/**
+ * Fields an Aadhaar card can never supply, whatever the scan does.
+ *
+ * The mobile number is in the QR only as a SHA-256 hash, never as digits.
+ * Category and income are separate certificates — a caste certificate and an
+ * income certificate — and are not in the Aadhaar record at all.
+ *
+ * Worth naming, because an empty box beside seven filled ones reads as the
+ * scan having half-worked. "Your card does not carry this" and "we could not
+ * read it" need to look different or people re-scan a good card.
+ */
+export const NEVER_ON_A_CARD: (keyof Profile)[] = ["mobile", "category", "income"];
+
 const EMPTY: Profile = Object.freeze({});
 
 let cache: Profile = EMPTY;
