@@ -15,14 +15,21 @@ services:
 
     healthCheckPath: /health
 
-    dockerBuildArgs:
-      # Bump this when the corpus is re-ingested and re-published. Pinning the
-      # tag is what makes a deployment reproducible; `corpus-latest` would let
-      # the data change underneath a running service with nothing to show for it.
-      CORPUS_TAG: corpus-2026-09-08
-      CORPUS_REPO: xdityagr/Avsarathi.ai
-
     envVars:
+      # ---- the catalogue build ------------------------------------------
+      # There is no `dockerBuildArgs` in a Blueprint. Render translates a
+      # Docker service's environment variables into build arguments on its
+      # own, so these reach the Dockerfile's ARG instructions from here.
+      #
+      # Bump the tag when the catalogue is re-ingested and re-published.
+      # Pinning is what makes a deployment reproducible; `corpus-latest` would
+      # let the data change underneath a running service with nothing to show
+      # for it.
+      - key: CORPUS_TAG
+        value: corpus-2026-09-08
+      - key: CORPUS_REPO
+        value: xdityagr/Avsarathi.ai
+
       # ---- where things live -------------------------------------------
       # The catalogue is baked into the image at /catalogue, never written to.
       # (AVSARATHI_CORPUS_DIR is a different setting — leave it unset.)

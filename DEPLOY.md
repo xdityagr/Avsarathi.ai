@@ -93,6 +93,23 @@ code. The myScheme catalogue uses `AVSARATHI_CATALOGUE_DIR`. Two different
 things in this repository are called "the corpus"; setting the wrong one killed
 the container on import, before it served a single request.
 
+### Build arguments
+
+There is no `dockerBuildArgs` field in a Blueprint — Render translates a Docker
+service's **environment variables** into build arguments by itself, so
+`CORPUS_TAG` and `CORPUS_REPO` are declared under `envVars` and reach the
+Dockerfile's `ARG` instructions from there.
+
+A consequence worth knowing: that translation applies to every variable,
+secrets included. They are only baked into the image if the Dockerfile
+*references* them with an `ARG`, and this one references exactly two — neither
+of which is a secret. Do not add `ARG GEMINI_API_KEY` or similar.
+
+The Dockerfile also carries the real tag as its `ARG` default, so `docker build`
+with no arguments produces a working image.
+
+---
+
 ## 3. The database
 
 There are two kinds of data here and conflating them is the mistake to avoid.
