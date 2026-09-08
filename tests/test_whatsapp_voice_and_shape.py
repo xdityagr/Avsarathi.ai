@@ -204,3 +204,41 @@ class TestConsentNotice:
 
         assert "STOP" in first
         assert "STOP" not in second
+
+class TestMediaPaths:
+    """A rendered map is a picture. Its path reached a real phone as the
+    literal line "/media/b6qNqD325DuGUa70Bo7mRQ.png" — not openable, not a
+    map, and indistinguishable from the assistant breaking."""
+
+    def test_a_path_on_its_own_line_is_removed(self):
+        from src.whatsapp_brain import strip_media_paths
+        assert strip_media_paths(
+            "Here is the map:\n/media/b6qNqD325DuGUa70Bo7mRQ.png"
+        ) == "Here is the map:"
+
+    def test_a_path_mid_sentence_is_removed(self):
+        from src.whatsapp_brain import strip_media_paths
+        assert "/media/" not in strip_media_paths(
+            "See /media/abcdefghij1234567890.png for the office")
+
+    def test_an_office_name_with_a_slash_survives(self):
+        from src.whatsapp_brain import strip_media_paths
+        name = "Rajasthan SC/ST Finance & Development Co-operative Corporation"
+        assert strip_media_paths(name) == name
+
+    def test_a_real_url_survives(self):
+        """Scheme pages are worth linking; only our own media plumbing is not."""
+        from src.whatsapp_brain import strip_media_paths
+        assert "nsfdc.nic.in" in strip_media_paths("Visit https://nsfdc.nic.in")
+
+    def test_the_prompt_forbids_writing_one(self):
+        from src.agent import SHAPE_WHATSAPP
+        flat = " ".join(SHAPE_WHATSAPP.lower().split())
+        assert "never write a file path" in flat
+
+    def test_the_wire_strips_it_too(self):
+        """Both reply builders strip it; this is the gate nothing routes around."""
+        import inspect
+        from src import meta_whatsapp
+        source = inspect.getsource(meta_whatsapp.send_text)
+        assert "strip_media_paths(body)" in source

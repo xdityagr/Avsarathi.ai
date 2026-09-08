@@ -28,6 +28,8 @@ from typing import Any, Optional
 
 import httpx
 
+from src.paths import strip_media_paths
+
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -152,6 +154,13 @@ def parse_webhook(payload: dict[str, Any]) -> list[IncomingMessage]:
 
 async def send_text(to: str, body: str) -> bool:
     """Send one message. Returns whether Meta accepted it."""
+    # The last gate. A map is delivered as a picture by `send_image`, so a
+    # /media/ path in a text body is always plumbing that escaped — from a
+    # renderer, or from the model quoting back something it was shown. Both
+    # reply builders already strip it; this is the one place nothing routes
+    # around, and it costs a regex on a message we are about to spend a
+    # network call on anyway.
+    body = strip_media_paths(body)
     settings = get_settings()
     if not is_configured():
         logger.error("WhatsApp not configured — cannot send to %s", to[:8] + "…")

@@ -24,6 +24,7 @@ stored next to a file you replace.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 
@@ -81,3 +82,22 @@ def describe() -> dict[str, str]:
         "catalogue_mb": (f"{CATALOGUE_DB.stat().st_size / 1e6:.0f}"
                          if CATALOGUE_DB.exists() else "0"),
     }
+
+#: What a rendered map looks like when it leaks into words.
+#:
+#: A map is a picture. Its path is plumbing, and it reached a real phone as the
+#: literal line "/media/b6qNqD325DuGUa70Bo7mRQ.png" — not a map, not tappable,
+#: and indistinguishable from the assistant breaking. It lives here, beside
+#: MEDIA_DIR, because the module that decides where media is written is the one
+#: that knows what its paths look like, and because the outermost send helper
+#: must be able to strip one without importing the conversation layer.
+_MEDIA_PATH = re.compile(r"\s*/media/[A-Za-z0-9_-]{10,}\.(?:png|jpe?g)\b")
+
+
+def strip_media_paths(text: str) -> str:
+    """Remove any rendered-media path from a message body."""
+    cleaned = _MEDIA_PATH.sub("", text or "")
+    # A line that held nothing but the path is now a dangling stub.
+    kept = [line for line in cleaned.splitlines()
+            if line.strip() not in ("", ":", "-", "•")]
+    return "\n".join(kept).strip()

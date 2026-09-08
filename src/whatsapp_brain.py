@@ -27,6 +27,7 @@ from collections import defaultdict, deque
 from typing import Deque
 
 from src.agent import is_available as agent_available, respond as agent_respond
+from src.paths import strip_media_paths
 from src.chat import turn as scripted_turn
 from src import handoff
 from src import whatsapp_consent as consent
@@ -310,7 +311,9 @@ async def _agent_reply(user_id: str, text: str, language: str | None) -> str:
             break
 
     body = to_whatsapp_markup(result.text or "")
-    message = body or render_cards(result.cards)
+    # Stripped once, at the last point both branches pass through — the card
+    # fallback renders paths too.
+    message = strip_media_paths(body or render_cards(result.cards))
     if not message.strip():
         return ""
 
@@ -335,11 +338,19 @@ async def _scripted_reply(user_id: str, text: str, language: str | None) -> str:
             f"{index}. {chip['label']}" for index, chip in enumerate(chips, start=1)
         ))
 
+    # The scripted flow draws maps too, and only the agent path was
+    # keeping them — so a map the fallback rendered was written to disk
+    # and then dropped on the floor.
+    for card in result.get("cards") or []:
+        if card.get("kind") == "map" and card.get("url"):
+            _CONTEXT[user_id]["pending_map"] = card["url"]
+            break
+
     cards = render_cards(result.get("cards") or [])
     if cards:
         parts.append(cards)
 
-    return _clip("\n\n".join(part for part in parts if part).strip())
+    return _clip(strip_media_paths("\n\n".join(part for part in parts if part).strip()))
 
 
 def resolve_numbered_choice(user_id: str, text: str) -> str:
