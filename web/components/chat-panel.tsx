@@ -739,6 +739,11 @@ function CardView({
   const s = (key: string) => card[key] as string | undefined;
   const n = (key: string) => card[key] as number | undefined;
   const tr = t as unknown as (key: string) => string;
+  // Same escape hatch as `tr`, for the few strings that interpolate.
+  const tv = t as unknown as (
+    key: string,
+    vars?: Record<string, string | number>,
+  ) => string;
 
   switch (card.kind) {
     case "matches": {
@@ -881,6 +886,40 @@ function CardView({
             ))}
           </dl>
         </div>
+      );
+    }
+
+    // The assistant can fill a form, and could say so with nothing to show
+    // for it — the card came back and no branch here rendered it. "I have
+    // filled in your details" has to be followed by the filled details.
+    case "application": {
+      const blanks = (card.blanks as string[]) ?? [];
+      const docs = (card.documents as string[]) ?? [];
+      return (
+        <Link
+          href={`/apply/${s("slug")}`}
+          className="block rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+        >
+          <p className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-medium">{s("name")}</span>
+            <span className="tnum text-sm text-muted-foreground">
+              {String(card.filled ?? "")}/{String(card.total ?? "")} {tr("apply.filledOf")}
+            </span>
+          </p>
+          {blanks.length ? (
+            <p className="mt-1.5 line-clamp-2 text-sm text-muted-foreground">
+              {tv("apply.blanksLeft", { n: blanks.length })}: {blanks.join(", ")}
+            </p>
+          ) : null}
+          {docs.length ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {tr("apply.documents")}: {docs.length}
+            </p>
+          ) : null}
+          <p className="mt-2.5 text-sm font-medium text-primary">
+            {tr("apply.open")} &rarr;
+          </p>
+        </Link>
       );
     }
 
