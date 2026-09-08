@@ -7,19 +7,25 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+#
+# These are setuptools artefacts and they live at the REPOSITORY ROOT, so they
+# are anchored with a leading slash. Unanchored, `lib/` matches a directory
+# called lib at ANY depth — which silently excluded the whole of `web/lib`:
+# the API client, the helpers and all thirteen locale files. Nothing in that
+# directory had ever been committed, and a fresh clone could not have built.
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -230,3 +236,7 @@ data/
 .env.local
 .env.production
 corpus/demo_signing_key.pem
+
+# Scratch from the brainstorming tool — prototypes and a live server's port
+# file. Useful while thinking, meaningless in the history.
+.superpowers/brainstorm/
