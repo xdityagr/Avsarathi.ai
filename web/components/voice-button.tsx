@@ -1,51 +1,55 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Mic, MicOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, Mic, Square } from "lucide-react";
 
 import { useLanguage } from "@/components/language-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Hold to talk.
+ * A voice message, the way WhatsApp does it.
  *
- * Typing Devanagari, Odia or Tamil on a phone keyboard is slow enough that
- * people give up and type romanised English instead — or give up entirely.
- * Speaking is the natural input for most of this audience, and dictation in
- * these languages is already on the device.
+ * This replaces hold-to-talk, which did not work. Two reasons, and both were
+ * fatal rather than fixable:
  *
- * Press and hold rather than tap-to-toggle: you can see exactly when it is
- * listening, and letting go always stops it. A microphone that might still be
- * on is a microphone people do not use twice.
+ * - It ran on the browser's Web Speech API, which is Chrome-only. Firefox has
+ *   none, most Android WebViews have none, and the failure is silent — the
+ *   button simply did nothing, on exactly the cheap phones this is built for.
+ * - Holding a button while speaking a whole sentence is genuinely awkward on a
+ *   phone, and any slip of the finger ends the recording mid-word.
+ *
+ * So: tap to start, tap to send. The audio goes to our own endpoint and is
+ * transcribed by the same engine that handles WhatsApp voice notes, which
+ * means one behaviour to reason about instead of two — and Indian-language
+ * accuracy that the browser never had.
+ *
+ * Typing Devanagari, Tamil or Odia on a phone keyboard is slow enough that
+ * people give up and type romanised English, or give up entirely. For a
+ * person who does not read comfortably in any script, this is not a
+ * convenience, it is the only usable input.
  */
 
-const SPEECH_LOCALES: Record<string, string> = {
-  en: "en-IN", hi: "hi-IN", bn: "bn-IN", mr: "mr-IN", te: "te-IN",
-  ta: "ta-IN", gu: "gu-IN", kn: "kn-IN", ml: "ml-IN", pa: "pa-IN",
-  or: "or-IN", as: "as-IN", ur: "ur-IN",
-};
+/** Long enough for a real question; past this we stop and send on our own. */
+const MAX_SECONDS = 60;
 
-interface SpeechRecognitionLike {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-}
+/** Below this nobody said anything — usually a mis-tap. */
+const MIN_MS = 400;
 
-function recogniser(): SpeechRecognitionLike | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: new () => SpeechRecognitionLike;
-    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-  };
-  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-  return Ctor ? new Ctor() : null;
+type Phase = "idle" | "recording" | "sending";
+
+/** Whichever container this browser will actually produce. */
+function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  for (const type of [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/ogg;codecs=opus",
+    "audio/mp4",
+  ]) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return undefined;
 }
 
 export function VoiceButton({
@@ -55,116 +59,182 @@ export function VoiceButton({
   className,
 }: {
   onTranscript: (text: string) => void;
+  /** Progress the caller can show while this is happening. */
   onInterim?: (text: string) => void;
   disabled?: boolean;
   className?: string;
 }) {
   const { lang, t } = useLanguage();
-  const [listening, setListening] = useState(false);
-  const engine = useRef<SpeechRecognitionLike | null>(null);
-  const finalText = useRef("");
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [seconds, setSeconds] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  // Whether the browser can hear at all is a fact about the browser, not state
-  // to discover in an effect. `useSyncExternalStore` gives the server a "no"
-  // and the client the truth, with no render in between.
-  const supported = useSyncExternalStore(
-    () => () => {},
-    () => recogniser() !== null,
-    () => false,
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startedRef = useRef(0);
+  const cancelledRef = useRef(false);
+
+  // Whatever happens, the microphone gets released. A page that leaves the
+  // recording indicator on is a page nobody grants the permission to twice.
+  const releaseMic = useCallback(() => {
+    recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+    recorderRef.current = null;
+  }, []);
+
+  useEffect(() => () => releaseMic(), [releaseMic]);
+
+  const send = useCallback(
+    async (blob: Blob, mimeType: string) => {
+      setPhase("sending");
+      onInterim?.(t("chat.voice.sending"));
+      try {
+        const form = new FormData();
+        form.append("audio", blob, "voice.webm");
+        // The interface language is a hint only — someone reading in English
+        // may well speak Marathi, and the engine detects better than we guess.
+        form.append("language", lang);
+
+        const response = await fetch("/api/transcribe", {
+          method: "POST",
+          body: form,
+        });
+        if (!response.ok) throw new Error(String(response.status));
+        const data = await response.json();
+
+        if (data.ok && data.text?.trim()) {
+          onInterim?.("");
+          onTranscript(data.text.trim());
+        } else {
+          onInterim?.("");
+          setError(t("chat.voice.unclear"));
+        }
+      } catch {
+        onInterim?.("");
+        setError(t("chat.voice.failed"));
+      } finally {
+        setPhase("idle");
+        setSeconds(0);
+      }
+    },
+    [lang, onInterim, onTranscript, t],
   );
 
   const stop = useCallback(() => {
-    setListening(false);
-    try {
-      engine.current?.stop();
-    } catch {
-      // Already stopped. Nothing to do.
-    }
+    const recorder = recorderRef.current;
+    if (!recorder || recorder.state === "inactive") return;
+    recorder.stop();
   }, []);
 
-  const start = useCallback(() => {
-    if (disabled) return;
-    const instance = recogniser();
-    if (!instance) return;
+  const start = useCallback(async () => {
+    if (disabled || phase !== "idle") return;
+    setError(null);
+    cancelledRef.current = false;
 
-    finalText.current = "";
-    instance.lang = SPEECH_LOCALES[lang] ?? "en-IN";
-    instance.continuous = true;
-    // Interim results let the words appear while they are still being said,
-    // which is the difference between "is this working?" and obviously working.
-    instance.interimResults = true;
-
-    instance.onresult = (event) => {
-      let interim = "";
-      for (let i = 0; i < event.results.length; i += 1) {
-        const result = event.results[i] as ArrayLike<{ transcript: string }> & {
-          isFinal?: boolean;
-        };
-        const text = result[0]?.transcript ?? "";
-        if (result.isFinal) finalText.current += text;
-        else interim += text;
-      }
-      onInterim?.((finalText.current + interim).trim());
-    };
-    instance.onerror = () => setListening(false);
-    instance.onend = () => {
-      setListening(false);
-      const text = finalText.current.trim();
-      if (text) onTranscript(text);
-    };
-
-    engine.current = instance;
+    let stream: MediaStream;
     try {
-      instance.start();
-      setListening(true);
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setListening(false);
+      // Denied, or no microphone. Either way it is not a failure to explain at
+      // length — the person can type instead, and the box is right there.
+      setError(t("chat.voice.noMic"));
+      return;
     }
-  }, [disabled, lang, onInterim, onTranscript]);
 
-  // Releasing anywhere stops it, not just over the button — a drag off the
-  // button must never leave the microphone open.
-  useEffect(() => {
-    if (!listening) return;
-    const end = () => stop();
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-    return () => {
-      window.removeEventListener("pointerup", end);
-      window.removeEventListener("pointercancel", end);
+    const mimeType = pickMimeType();
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    recorderRef.current = recorder;
+    chunksRef.current = [];
+    startedRef.current = Date.now();
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
     };
-  }, [listening, stop]);
+    recorder.onstop = () => {
+      const held = Date.now() - startedRef.current;
+      const type = recorder.mimeType || mimeType || "audio/webm";
+      const blob = new Blob(chunksRef.current, { type });
+      releaseMic();
 
-  if (!supported) return null;
+      if (cancelledRef.current || held < MIN_MS || blob.size === 0) {
+        setPhase("idle");
+        setSeconds(0);
+        return;
+      }
+      void send(blob, type);
+    };
+
+    recorder.start();
+    setPhase("recording");
+    setSeconds(0);
+  }, [disabled, phase, releaseMic, send, t]);
+
+  // The running count, and the backstop that ends a recording someone forgot
+  // to stop rather than uploading four minutes of room noise.
+  useEffect(() => {
+    if (phase !== "recording") return;
+    const timer = window.setInterval(() => {
+      setSeconds((value) => {
+        if (value + 1 >= MAX_SECONDS) stop();
+        return value + 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [phase, stop]);
+
+  // Errors clear themselves; a stale "could not hear that" next to a working
+  // microphone is worse than no message at all.
+  useEffect(() => {
+    if (!error) return;
+    const timer = window.setTimeout(() => setError(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [error]);
+
+  const recording = phase === "recording";
+  const sending = phase === "sending";
 
   return (
-    <Button
-      type="button"
-      variant={listening ? "default" : "ghost"}
-      size="icon"
-      disabled={disabled}
-      aria-label={t(listening ? "chat.voice.listening" : "chat.voice.hold")}
-      aria-pressed={listening}
-      onPointerDown={(event) => {
-        event.preventDefault();
-        start();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === " " || event.key === "Enter") {
-          event.preventDefault();
-          if (!listening) start();
-        }
-      }}
-      onKeyUp={(event) => {
-        if (event.key === " " || event.key === "Enter") stop();
-      }}
-      className={cn(
-        "size-10 shrink-0 touch-none select-none",
-        listening && "animate-pulse",
-        className,
-      )}
-    >
-      {listening ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-    </Button>
+    <div className="relative flex shrink-0 items-center gap-2">
+      {recording ? (
+        <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+          <span className="size-2 animate-pulse rounded-full bg-destructive" />
+          {String(Math.floor(seconds / 60)).padStart(1, "0")}:
+          {String(seconds % 60).padStart(2, "0")}
+        </span>
+      ) : null}
+
+      {error ? (
+        <span
+          role="status"
+          className="absolute bottom-full end-0 mb-2 w-max max-w-[15rem] rounded-lg
+                     border border-border bg-card px-2.5 py-1.5 text-xs text-muted-foreground
+                     shadow-sm"
+        >
+          {error}
+        </span>
+      ) : null}
+
+      <Button
+        type="button"
+        variant={recording ? "default" : "ghost"}
+        size="icon"
+        disabled={disabled || sending}
+        aria-label={t(
+          recording ? "chat.voice.stop"
+          : sending ? "chat.voice.sending"
+          : "chat.voice.record",
+        )}
+        aria-pressed={recording}
+        onClick={() => (recording ? stop() : void start())}
+        className={cn("size-10 shrink-0 rounded-full", className)}
+      >
+        {sending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : recording ? (
+          <Square className="size-3.5 fill-current" />
+        ) : (
+          <Mic className="size-4" />
+        )}
+      </Button>
+    </div>
   );
 }
