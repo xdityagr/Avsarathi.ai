@@ -60,7 +60,12 @@ export const PROFILE_FIELDS: {
 }[] = [
   { key: "full_name", labelKey: "profile.full_name" },
   { key: "parent_name", labelKey: "profile.parent_name" },
-  { key: "dob", labelKey: "profile.dob", type: "date" },
+  // Text, not `type="date"`. A date input renders BLANK unless the value is
+  // exactly YYYY-MM-DD, and many Aadhaar cards carry only a year of birth —
+  // so a perfectly good answer read off the card vanished into an empty box.
+  // A picker is also the wrong control here: someone born in 1975 has to
+  // scroll back fifty years on a phone.
+  { key: "dob", labelKey: "profile.dob" },
   { key: "gender", labelKey: "profile.gender" },
   { key: "category", labelKey: "profile.category" },
   { key: "mobile", labelKey: "profile.mobile", type: "tel" },

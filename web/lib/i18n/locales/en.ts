@@ -335,4 +335,6 @@ export const en = {
   "profile.scan": "Fill from Aadhaar",
   "profile.privacy": "Kept on this phone only. We do not store it, and clearing it here removes it.",
   "nav.me": "About you",
+  "profile.scanFilled": "Filled in from your card:",
+  "profile.scanMissing": "Your mobile number is not stored in the QR code — only a scrambled version of it — so that one has to be typed. Add your category and income too; a card does not carry them.",
 } as const;

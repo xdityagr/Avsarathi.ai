@@ -778,9 +778,10 @@ async def read_aadhaar_qr(request: AadhaarQrRequest) -> dict:
     except aadhaar_qr.AadhaarQrError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
+    # The card's own DD-MM-YYYY is kept. It was being converted to ISO for an
+    # <input type="date"> that no longer exists, and the conversion silently
+    # dropped year-only cards — which a government form would have accepted.
     profile = aadhaar_qr.to_profile(scanned)
-    if profile.get("dob"):
-        profile["dob"] = aadhaar_qr.dob_to_iso(profile["dob"])
 
     # Never the payload itself, and never the demographics — a short hash is
     # enough to trace one scan through the logs.

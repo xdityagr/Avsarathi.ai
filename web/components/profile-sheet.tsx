@@ -55,7 +55,9 @@ export function ProfileSheet({
   const stored = useProfile();
   const [draft, setDraft] = useState<Profile>(stored);
   const [scanning, setScanning] = useState(false);
-  const [scan, setScan] = useState<{ verified: boolean; last4: string } | null>(null);
+  const [scan, setScan] = useState<
+    { verified: boolean; last4: string; filled: string[] } | null
+  >(null);
   const [saved, setSaved] = useState(false);
 
   const filled = profileFilled(draft);
@@ -78,7 +80,16 @@ export function ProfileSheet({
             // The card fills what it knows and leaves the rest alone — someone
             // who already typed their income should not lose it to a scan.
             setDraft((prev) => ({ ...prev, ...fromCard }));
-            setScan({ verified, last4 });
+            setScan({
+              verified,
+              last4,
+              // Named, not counted. "5 of 11" leaves someone hunting for which
+              // five, and a field that silently stayed empty looks like the
+              // scan failing rather than the card not carrying it.
+              filled: PROFILE_FIELDS
+                .filter(({ key }) => (fromCard as Record<string, unknown>)[key])
+                .map(({ labelKey }) => t(labelKey as StringKey)),
+            });
             setScanning(false);
           }}
         />
@@ -94,7 +105,25 @@ export function ProfileSheet({
         </Button>
       )}
 
-      {scan ? <ScanResult verified={scan.verified} last4={scan.last4} /> : null}
+      {scan ? (
+        <div className="rounded-xl border border-border bg-secondary/40 p-4">
+          <ScanResult verified={scan.verified} last4={scan.last4} />
+          {scan.filled.length ? (
+            <p className="mt-2 text-sm leading-relaxed text-foreground">
+              {t("profile.scanFilled")} {scan.filled.join(", ")}.
+            </p>
+          ) : null}
+          {/*
+            Said outright, because its absence looks like a bug. UIDAI puts
+            only a SHA-256 hash of the mobile number in the QR, never the
+            number — so this one can never be filled from a card, however
+            good the scan was.
+          */}
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {t("profile.scanMissing")}
+          </p>
+        </div>
+      ) : null}
 
       <form
         className="space-y-4"
