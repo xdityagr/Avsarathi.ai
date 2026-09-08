@@ -189,6 +189,57 @@ async def send_text(to: str, body: str) -> bool:
     return True
 
 
+async def send_image(to: str, link: str, caption: str = "") -> bool:
+    """Send one image by public URL. Returns whether Meta accepted it.
+
+    Meta fetches `link` itself, from the public internet, with no credentials
+    of ours — so it has to be a URL that is genuinely reachable from outside,
+    not a loopback address that only works on the machine that rendered it.
+    Callers are responsible for building an absolute one.
+
+    No caption is sent by default, and that is deliberate. A caption here would
+    have to be written in the reader's language, and there is no translation
+    table on this path; an English line under a map in a Tamil conversation is
+    worse than no line at all. The message that precedes the image carries the
+    explanation, and the OpenStreetMap credit is drawn into the image itself.
+    """
+    settings = get_settings()
+    if not is_configured():
+        logger.error("WhatsApp not configured — cannot send image to %s", to[:8] + "…")
+        return False
+
+    url = f"{_base()}/{settings.whatsapp_phone_number_id}/messages"
+    image: dict[str, str] = {"link": link}
+    if caption:
+        image["caption"] = caption
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": to,
+        "type": "image",
+        "image": image,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            response = await client.post(
+                url,
+                json=payload,
+                headers={"Authorization": f"Bearer {settings.whatsapp_token}"},
+            )
+    except Exception as exc:                                  # noqa: BLE001
+        logger.warning("Image send failed to %s: %s", to[:8] + "…", exc)
+        return False
+
+    if response.status_code >= 400:
+        # The usual cause is a link Meta could not fetch: a private host, a
+        # self-signed certificate, or a tunnel that has since closed.
+        logger.warning("Meta rejected the image (%s): %s",
+                       response.status_code, response.text[:400])
+        return False
+    return True
+
+
 async def fetch_media(media_id: str) -> tuple[bytes, str]:
     """Two requests: the media's URL by id, then the bytes themselves.
 

@@ -52,6 +52,12 @@ _worker: MessageWorker | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
+    # A mounted volume starts empty and SQLite will not create a missing
+    # parent — the first write would fail with "unable to open database
+    # file", which says nothing about a directory.
+    from src.paths import ensure_state_dirs
+    ensure_state_dirs()
+
     global _worker
 
     settings = get_settings()
@@ -105,11 +111,28 @@ app.include_router(api_router)
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint — returns 200 if the server is running."""
+    """Health check — 200 when the server is up, and where its data is.
+
+    The paths are here because the commonest way a container deployment goes
+    wrong is a disk mounted somewhere other than where the app looks, and that
+    is invisible until something tries to read the corpus or write an opt-out.
+    Reporting them turns a mystifying 500 into one glance.
+
+    Also what Render's health check hits, and what an external ping should hit
+    to keep a free instance from spinning down — see DEPLOY.md.
+    """
+    from src import paths
+
+    where = paths.describe()
     return {
-        "status": "ok",
+        "status": "ok" if where["corpus_present"] == "True" else "degraded",
         "service": "avsarathi",
-        "phase": "0",
+        "corpus": {
+            "found": where["corpus_present"] == "True",
+            "size_mb": where["corpus_mb"],
+            "dir": where["corpus_dir"],
+        },
+        "state_dir": where["state_dir"],
     }
 
 
@@ -177,7 +200,7 @@ async def api_info():
 # ---------------------------------------------------------------------------
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
-MEDIA_DIR = Path("data/maps")
+from src.paths import MEDIA_DIR
 MEDIA_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{22}\.png$")
 MEDIA_TTL_SECONDS = 3600
 

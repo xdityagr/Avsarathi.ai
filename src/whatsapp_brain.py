@@ -124,6 +124,15 @@ def _clip(text: str) -> str:
     return (cut[:boundary] if boundary > MAX_MESSAGE_CHARS * 0.6 else cut).rstrip() + "…"
 
 
+def take_pending_map(user_id: str) -> str | None:
+    """The map this reply produced, if any — and only once.
+
+    Popped rather than read, so a map is never sent twice for one lookup and
+    never trails a later message it has nothing to do with.
+    """
+    return _CONTEXT[user_id].pop("pending_map", None)
+
+
 def render_cards(cards: list[dict]) -> str:
     """Structured results as lines someone can read on a phone.
 
@@ -292,6 +301,14 @@ async def _agent_reply(user_id: str, text: str, language: str | None) -> str:
     # printed the same four schemes twice in one bubble, once in the model's
     # sentences and once as a bulleted list underneath. Whichever the reader
     # believed, the other one made them doubt it.
+    # A map, if the offices lookup drew one. Held aside rather than described:
+    # the worker sends it as a second message once the text has landed, so the
+    # answer arrives first and the picture confirms it.
+    for card in result.cards:
+        if card.get("kind") == "map" and card.get("url"):
+            _CONTEXT[user_id]["pending_map"] = card["url"]
+            break
+
     body = to_whatsapp_markup(result.text or "")
     message = body or render_cards(result.cards)
     if not message.strip():

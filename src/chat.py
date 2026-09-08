@@ -30,6 +30,7 @@ from typing import Any, Optional
 
 from src.calculator import MoratoriumType, calculate_emi
 from src.discovery import Facets, discover
+from src.paths import MEDIA_DIR, TILE_DIR
 from src.config import SCHEMES, get_settings
 from src.i18n import DEFAULT_LANGUAGE, LANGUAGES, detect_language, t
 from src.routing import route_partners, utilisation_note
@@ -456,7 +457,7 @@ async def _render_map(place: dict, ranked) -> Optional[str]:
         pins += [MapPin(r.partner.latitude, r.partner.longitude, str(i + 1))
                  for i, r in enumerate(ranked)
                  if r.partner.latitude is not None]
-        path = await render_map(pins, Path("data/maps"), cache_dir=Path("data/tiles"))
+        path = await render_map(pins, MEDIA_DIR, cache_dir=TILE_DIR)
         return f"/media/{path.name}"
     except Exception as exc:
         logger.warning("Chat map render failed: %s", exc)

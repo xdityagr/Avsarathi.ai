@@ -31,6 +31,7 @@ from typing import Any, AsyncIterator, Optional
 from src import application
 from src.calculator import calculate_emi
 from src.catalog import catalog_meta, get_scheme, search_schemes
+from src.paths import MEDIA_DIR, TILE_DIR
 from src.config import SCHEMES, get_settings
 from src.discovery import Facets, discover_with_credit, evaluate_scheme
 from src.i18n import LANGUAGES
@@ -448,6 +449,13 @@ def _tool_find_offices(
         ) if p.latitude and p.longitude else 1e9)
 
     items = []
+    # Kept beside the items rather than inside them: the model is shown the
+    # items and has no use for coordinates, but the interface needs them to
+    # draw the map. See the map rendering in the tool loop.
+    pins: list[dict] = []
+    if latitude is not None and longitude is not None:
+        pins.append({"lat": latitude, "lon": longitude, "label": "You"})
+
     for partner in candidates[:4]:
         distance = (
             round(haversine_km(latitude, longitude, partner.latitude, partner.longitude), 1)
@@ -455,6 +463,12 @@ def _tool_find_offices(
             and partner.latitude and partner.longitude
             else None
         )
+        if partner.latitude is not None and partner.longitude is not None:
+            pins.append({
+                "lat": partner.latitude,
+                "lon": partner.longitude,
+                "label": str(len(pins) if latitude is not None else len(pins) + 1),
+            })
         items.append({
             "name": partner.name,
             "where": ", ".join(x for x in (partner.district, partner.state) if x),
@@ -467,7 +481,7 @@ def _tool_find_offices(
     if not items:
         return {"offices": []}, [], "no office found"
     return ({"offices": items},
-            [{"kind": "partners", "items": items}],
+            [{"kind": "partners", "items": items, "pins": pins}],
             f"{len(items)} office(s) in {state}")
 
 
@@ -611,6 +625,33 @@ def _tool_prepare_application(
     }
     summary = f"{payload['filled']} of {payload['total']} fields filled"
     return payload, [card], summary
+
+
+async def _render_office_map(cards: list[dict]) -> Optional[dict]:
+    """A map card for whatever `find_offices` just returned, or nothing.
+
+    Never fatal and never retried. The list of offices is the answer; the map
+    is how that answer is read at a glance, and a tile server having a bad
+    minute is not a reason to fail the reply.
+    """
+    pins_raw: list[dict] = []
+    for card in cards:
+        if card.get("kind") == "partners":
+            pins_raw = card.get("pins") or []
+            break
+    if len(pins_raw) < 1:
+        return None
+
+    try:
+        from pathlib import Path
+        from src.maps import MapPin, render_map
+
+        pins = [MapPin(p["lat"], p["lon"], p.get("label", "")) for p in pins_raw]
+        path = await render_map(pins, MEDIA_DIR, cache_dir=TILE_DIR)
+        return {"kind": "map", "url": f"/media/{path.name}"}
+    except Exception as exc:                          # noqa: BLE001
+        logger.warning("Agent map render failed: %s", exc)
+        return None
 
 
 TOOL_IMPLEMENTATIONS = {
@@ -964,6 +1005,16 @@ async def stream(
                 except Exception as exc:              # noqa: BLE001
                     logger.warning("Tool %s failed: %s", name, exc)
                     payload, cards, summary = {"error": str(exc)}, [], "failed"
+
+            # A list of offices answers "which"; a map answers "where", and
+            # the second is the question someone standing at a bus stand is
+            # actually asking. The scripted flow has always drawn one — the
+            # agentic path returned only the list, so the model could never
+            # show it however clearly it was asked.
+            if name == "find_offices":
+                map_card = await _render_office_map(cards)
+                if map_card is not None:
+                    cards.append(map_card)
 
             reply.cards.extend(cards)
             step = ToolCall(

@@ -20,10 +20,8 @@ import logging
 import time
 from collections import defaultdict
 
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from src.config import get_settings
-from src.graph import build_graph
 from src import meta_whatsapp as meta
 from src import speech
 from src.whatsapp_brain import (
@@ -85,6 +83,42 @@ class RateLimiter:
 # number or place, short enough that it stays a footnote to the answer rather
 # than competing with it.
 ECHO_CHARS = 90
+
+
+def _public_media_url(path: str) -> str | None:
+    """Turn "/media/x.png" into something Meta can actually fetch.
+
+    Meta pulls the image from the open internet with none of our credentials,
+    so a relative path or a loopback address is useless to it. Without a public
+    base configured there is nothing to send, and saying so once in the log is
+    better than a rejected message every time.
+    """
+    base = (get_settings().webhook_base_url or "").rstrip("/")
+    if not base or base.startswith(("http://localhost", "http://127.")):
+        return None
+    return f"{base}{path}"
+
+
+async def _send_pending_map(user_id: str) -> None:
+    """Send the map the last answer produced, if there was one.
+
+    Never fatal. The text message is the answer; the map is a second look at
+    it, and failing to deliver a picture is not a reason to surface an error to
+    someone who has already been told what they needed to know.
+    """
+    try:
+        from src.whatsapp_brain import take_pending_map
+
+        path = take_pending_map(user_id)
+        if not path:
+            return
+        link = _public_media_url(path)
+        if not link:
+            logger.info("Map ready but WEBHOOK_BASE_URL is not public — not sending")
+            return
+        await meta.send_image(to=user_id, link=link)
+    except Exception as exc:                                  # noqa: BLE001
+        logger.warning("Map send failed for %s: %s", user_id[:10] + "…", exc)
 
 
 def _echo(heard: str) -> str:

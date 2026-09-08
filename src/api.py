@@ -34,6 +34,7 @@ from src.agent import (
 )
 from src.calculator import calculate_emi
 from src.catalog import catalog_meta, get_scheme, search_schemes
+from src.paths import MEDIA_DIR, TILE_DIR
 from src.config import SCHEMES, get_settings
 from src.corpus import load_corpus
 from src.discovery import Facets, discover_with_credit, evaluate_scheme
@@ -69,8 +70,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["portal"])
 
-MEDIA_DIR = Path("data/maps")
-TILE_CACHE_DIR = Path("data/tiles")
+from src.paths import MEDIA_DIR
+from src.paths import TILE_DIR as TILE_CACHE_DIR
 
 
 class ChatRequest(BaseModel):

@@ -23,6 +23,10 @@ dependencies = [
     "selectolax>=0.3",
     # --- map rendering ---
     "Pillow>=10.0",
+    "python-multipart>=0.0.20",
+    "cryptography>=44.0",
+    "lxml>=5.0",
+    "langchain-core>=1.0",
 ]
 
 [project.optional-dependencies]

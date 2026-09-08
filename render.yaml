@@ -1,0 +1,68 @@
+# Render Blueprint for the Avsarathi engine.
+#
+# The front end is not here. It goes to Vercel, which proxies /api/* to this
+# service through a Next rewrite — so the browser only ever talks to one
+# origin, there is no CORS to configure, and this URL never appears in client
+# code. See DEPLOY.md.
+
+services:
+  - type: web
+    name: avsarathi-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: singapore          # closest Render region to India
+    plan: free
+
+    healthCheckPath: /health
+
+    dockerBuildArgs:
+      # Bump this when the corpus is re-ingested and re-published. Pinning the
+      # tag is what makes a deployment reproducible; `corpus-latest` would let
+      # the data change underneath a running service with nothing to show for it.
+      CORPUS_TAG: corpus-2026-09-08
+      CORPUS_REPO: xdityagr/Avsarathi.ai
+
+    envVars:
+      # ---- where things live -------------------------------------------
+      # The corpus is baked into the image at /corpus and never written to.
+      - key: AVSARATHI_CORPUS_DIR
+        value: /corpus
+      # State — opt-outs, message idempotency, the geocoding cache. On the free
+      # plan this is the container's own filesystem and does NOT survive a
+      # deploy or a spin-down. Attach the disk below to fix that.
+      - key: AVSARATHI_STATE_DIR
+        value: /data
+
+      # ---- secrets: set these in the Render dashboard, not here ---------
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: DEEPGRAM_API_KEY
+        sync: false
+      - key: WHATSAPP_SAT
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_BUSINESS_ACCOUNT_ID
+        sync: false
+
+      - key: WEBHOOK_BASE_URL
+        sync: false          # the https://…onrender.com URL, once it exists
+      - key: WEBHOOK_VERIFY_SIGNATURES
+        value: "true"
+
+    # ---- persistence ---------------------------------------------------
+    # Uncomment on a paid instance. Without it the state directory is
+    # ephemeral: a redeploy or a spin-down forgets who sent STOP, and someone
+    # who opted out of WhatsApp gets messaged again. That is the one data loss
+    # here that is not merely inconvenient.
+    #
+    # disk:
+    #   name: avsarathi-state
+    #   mountPath: /data
+    #   sizeGB: 1

@@ -35,7 +35,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-CACHE_PATH = Path("data/geo-cache.db")
+from src.paths import GEO_CACHE_DB as CACHE_PATH
 
 # Both services ask that automated callers identify themselves. Nominatim's
 # usage policy in particular requires a real contact address, and being a good

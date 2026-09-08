@@ -8,12 +8,24 @@ when a verified NSFDC number comes back from the SPOC meeting.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
 
 from src.corpus import legacy_schemes_dict
 from pydantic import Field
+
+
+def _default_state_db() -> "Path":
+    """Resolved late so AVSARATHI_STATE_DIR is read at import, not at build.
+
+    Imported inside the function because `src.paths` must not depend on the
+    settings and the settings must not depend on the paths at module scope.
+    """
+    from src.paths import STATE_DB
+    return STATE_DB
 
 
 class Settings(BaseSettings):
@@ -86,9 +98,14 @@ class Settings(BaseSettings):
     )
 
     # --- Database ---
+    #
+    # State, not corpus. Tiny, written to, and it has to survive a deploy —
+    # which on a container means it must sit on a mounted disk rather than in
+    # the image. `AVSARATHI_STATE_DIR` moves it without a code change; see
+    # `src.paths` for why the corpus is kept somewhere else entirely.
     database_path: str = Field(
-        default="data/avsarathi.db",
-        description="Path to SQLite database file",
+        default_factory=lambda: str(_default_state_db()),
+        description="SQLite file holding state that must outlive a restart",
     )
 
     # --- Rate limiting ---
