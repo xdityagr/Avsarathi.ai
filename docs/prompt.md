@@ -1,4 +1,4 @@
-# prompt.md — Paste this to Claude Opus / Gemini in Antigravity to start (or resume) a build session
+# prompt.md — Paste this to start (or resume) a build session
 
 You're helping build the backend for a Smart India Hackathon 2026 project: PS26092, an AI-driven scheme-matching platform for NSFDC (National Scheduled Castes Finance and Development Corporation) credit schemes, delivered primarily over WhatsApp. This extends an existing project called GrantBot (LangGraph + Gemini + WhatsApp via Twilio), not a fresh build.
 
