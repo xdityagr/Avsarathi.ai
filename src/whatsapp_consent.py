@@ -46,14 +46,50 @@ STOP_WORDS = {
 
 START_WORDS = {"start", "शुरू", "शुरु", "চালু", "தொடங்கு", "प्रारंभ", "resume"}
 
-NOTICE = (
-    "Namaste. I can find the government schemes you are entitled to — housing, "
-    "pension, scholarship, medical help, a business loan — check what you "
-    "qualify for, and point you to an office that can process it.\n\n"
-    "What you tell me is used to match schemes and nothing else. I never ask "
-    "for your Aadhaar number, your bank password, or any fee.\n\n"
-    "Reply *STOP* at any time and I will not message you again."
-)
+# One line, in the person's own language, sent once as a footer under the first
+# real answer.
+#
+# It used to be three English paragraphs sitting ABOVE the answer, and it cost
+# more than it looks: WhatsApp folds a long message behind "Read more", so the
+# notice pushed the actual answer out of sight, and it arrived in English next
+# to a Hindi reply. A privacy notice nobody reads protects nobody. What has to
+# survive is the substance — the data is only used for matching, we never ask
+# for Aadhaar or money, and STOP works — so that is all that is left.
+NOTICES = {
+    "en": "🔒 _Your answers are only used to find schemes. I never ask for your "
+          "Aadhaar number, bank password or any fee. Send *STOP* to end._",
+    "hi": "🔒 _आपकी जानकारी सिर्फ़ योजनाएँ ढूँढने के लिए है। मैं कभी आधार नंबर, बैंक "
+          "पासवर्ड या पैसा नहीं माँगती। बंद करने के लिए *STOP* भेजें।_",
+    "mr": "🔒 _तुमची माहिती फक्त योजना शोधण्यासाठी वापरली जाते. मी कधीही आधार क्रमांक, "
+          "बँक पासवर्ड किंवा पैसे मागत नाही. थांबवण्यासाठी *STOP* पाठवा._",
+    "bn": "🔒 _আপনার তথ্য শুধু প্রকল্প খুঁজতে ব্যবহার হয়। আমি কখনও আধার নম্বর, ব্যাঙ্কের "
+          "পাসওয়ার্ড বা টাকা চাই না। বন্ধ করতে *STOP* পাঠান।_",
+    "ta": "🔒 _உங்கள் தகவல் திட்டங்களைத் தேட மட்டுமே பயன்படுகிறது. ஆதார் எண், வங்கி "
+          "கடவுச்சொல் அல்லது பணம் நான் ஒருபோதும் கேட்பதில்லை. நிறுத்த *STOP* அனுப்பவும்._",
+    "te": "🔒 _మీ సమాచారం పథకాలు వెతకడానికి మాత్రమే. ఆధార్ నంబర్, బ్యాంక్ పాస్‌వర్డ్ లేదా "
+          "డబ్బు నేను ఎప్పుడూ అడగను. ఆపడానికి *STOP* పంపండి._",
+    "gu": "🔒 _તમારી માહિતી ફક્ત યોજનાઓ શોધવા વપરાય છે. હું ક્યારેય આધાર નંબર, બેંક "
+          "પાસવર્ડ કે પૈસા માંગતી નથી. બંધ કરવા *STOP* મોકલો._",
+    "kn": "🔒 _ನಿಮ್ಮ ಮಾಹಿತಿ ಯೋಜನೆಗಳನ್ನು ಹುಡುಕಲು ಮಾತ್ರ. ಆಧಾರ್ ಸಂಖ್ಯೆ, ಬ್ಯಾಂಕ್ ಪಾಸ್‌ವರ್ಡ್ "
+          "ಅಥವಾ ಹಣ ನಾನು ಎಂದಿಗೂ ಕೇಳುವುದಿಲ್ಲ. ನಿಲ್ಲಿಸಲು *STOP* ಕಳುಹಿಸಿ._",
+    "ml": "🔒 _നിങ്ങളുടെ വിവരങ്ങൾ പദ്ധതികൾ കണ്ടെത്താൻ മാത്രം. ആധാർ നമ്പർ, ബാങ്ക് "
+          "പാസ്‌വേഡ് അല്ലെങ്കിൽ പണം ഞാൻ ഒരിക്കലും ചോദിക്കില്ല. നിർത്താൻ *STOP* അയക്കുക._",
+    "pa": "🔒 _ਤੁਹਾਡੀ ਜਾਣਕਾਰੀ ਸਿਰਫ਼ ਸਕੀਮਾਂ ਲੱਭਣ ਲਈ ਹੈ। ਮੈਂ ਕਦੇ ਆਧਾਰ ਨੰਬਰ, ਬੈਂਕ ਪਾਸਵਰਡ ਜਾਂ "
+          "ਪੈਸੇ ਨਹੀਂ ਮੰਗਦੀ। ਬੰਦ ਕਰਨ ਲਈ *STOP* ਭੇਜੋ।_",
+    "or": "🔒 _ଆପଣଙ୍କ ସୂଚନା କେବଳ ଯୋଜନା ଖୋଜିବା ପାଇଁ। ମୁଁ କେବେ ଆଧାର ନମ୍ବର, ବ୍ୟାଙ୍କ ପାସୱାର୍ଡ "
+          "କିମ୍ବା ଟଙ୍କା ମାଗେ ନାହିଁ। ବନ୍ଦ କରିବାକୁ *STOP* ପଠାନ୍ତୁ।_",
+    "as": "🔒 _আপোনাৰ তথ্য কেৱল আঁচনি বিচাৰিবলৈহে ব্যৱহাৰ হয়। মই কেতিয়াও আধাৰ নম্বৰ, "
+          "বেংকৰ পাছৱৰ্ড বা টকা নিবিচাৰোঁ। বন্ধ কৰিবলৈ *STOP* পঠিয়াওক।_",
+    "ur": "🔒 _آپ کی معلومات صرف اسکیمیں تلاش کرنے کے لیے ہیں۔ میں کبھی آدھار نمبر، "
+          "بینک پاس ورڈ یا پیسے نہیں مانگتی۔ بند کرنے کے لیے *STOP* بھیجیں۔_",
+}
+
+NOTICE = NOTICES["en"]
+
+
+def notice(language: str | None) -> str:
+    """The privacy line in the language this person is writing in."""
+    return NOTICES.get(language or "en", NOTICES["en"])
 
 STOPPED = (
     "Stopped. I will not message you again.\n\n"

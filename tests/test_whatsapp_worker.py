@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from src.speech import Transcript
 from src.worker import MessageWorker
 
 
@@ -85,10 +86,9 @@ async def test_a_voice_note_is_transcribed_before_it_reaches_the_brain(worker):
          patch("src.worker.speech") as speech:
         speech.is_available.return_value = True
         sender.fetch_media = AsyncMock(return_value=(b"audio-bytes", "audio/ogg"))
-        speech.transcribe = AsyncMock(
-            return_value=type("T", (), {"ok": True, "unclear": False,
-                                        "text": "मुझे पेंशन चाहिए"})(),
-        )
+        speech.transcribe = AsyncMock(return_value=Transcript(
+            text="मुझे पेंशन चाहिए", ok=True, language="hi", provider="sarvam",
+        ))
         brain.return_value = "reply"
         sender.send_text = AsyncMock(return_value=True)
 
@@ -110,9 +110,7 @@ async def test_an_unintelligible_voice_note_asks_for_another(worker):
          patch("src.worker.speech") as speech:
         speech.is_available.return_value = True
         sender.fetch_media = AsyncMock(return_value=(b"noise", "audio/ogg"))
-        speech.transcribe = AsyncMock(
-            return_value=type("T", (), {"ok": False, "unclear": True, "text": ""})(),
-        )
+        speech.transcribe = AsyncMock(return_value=Transcript(unclear=True))
         sender.send_text = AsyncMock(return_value=True)
 
         await worker._process_message(

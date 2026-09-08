@@ -33,8 +33,12 @@ from src.i18n import detect_language
 
 logger = logging.getLogger(__name__)
 
-# WhatsApp's own limit is 1600 characters; well short of it is kinder anyway.
-MAX_MESSAGE_CHARS = 1400
+# WhatsApp's own limit is 1600 characters, but that is not the limit that
+# matters. The client folds a long message behind a "Read more" link at roughly
+# 700, and a folded answer is an unread answer — the first version of this shipped
+# a 1,400-character wall whose actual advice was below the fold. This is a hard
+# backstop; the real work is done by the prompt, which asks for about six lines.
+MAX_MESSAGE_CHARS = 800
 
 # The last few turns per phone number, so the assistant can follow a thread.
 # In memory on purpose: it is small, it is not worth a schema, and losing it on
@@ -70,6 +74,30 @@ def known_language(user_id: str) -> str:
     scheme name.
     """
     return _CONTEXT[user_id].get("language", "en")
+
+
+def language_if_known(user_id: str) -> str | None:
+    """The same thing, but honest about not knowing yet.
+
+    `known_language` answers "en" for someone we have never heard from, which
+    is the right default for writing a reply and the wrong one for listening to
+    a voice note: it tells the transcriber to expect English from a person who
+    may be speaking Tamil. None means "work it out", and the transcriber is
+    better at that than we are.
+    """
+    return _CONTEXT[user_id].get("language")
+
+
+def remember_detected_language(user_id: str, language: str | None) -> None:
+    """Learn the language from a voice note, not just from a typed script.
+
+    Someone whose first message is spoken has told us just as clearly as
+    someone who typed — and they are more likely to be the person who cannot
+    type in their own script at all, so this is the case that matters most.
+    """
+    if language and language != _CONTEXT[user_id].get("language"):
+        logger.info("Language for %s set to %s from speech", user_id[:8], language)
+        _CONTEXT[user_id]["language"] = language
 
 
 def to_whatsapp_markup(text: str) -> str:
@@ -174,24 +202,25 @@ async def reply(user_id: str, text: str) -> str:
 
     language = remember_language(user_id, text)
 
-    # The notice goes out once, alongside the first real answer rather than
-    # instead of it. Making someone say a magic word before being helped is how
-    # you lose the person this is for.
-    prefix = ""
+    # The notice goes out once, UNDER the first real answer rather than above
+    # it. Making someone say a magic word before being helped is how you lose
+    # the person this is for — and putting the notice first pushed the answer
+    # behind WhatsApp's "Read more" fold, which loses them just as effectively.
+    footer = ""
     if not _CONTEXT[user_id].get("greeted"):
         _CONTEXT[user_id]["greeted"] = True
-        prefix = f"{consent.NOTICE}\n\n———\n\n"
+        footer = f"\n\n{consent.notice(language)}"
 
     if agent_available():
         answer = await _agent_reply(user_id, text, language)
         if answer:
-            return _clip(prefix + answer)
+            return _clip(answer) + footer
         # The agent stood aside — no key, or every model's quota is spent. The
         # scripted flow still works, and a person mid-question should not be
         # told to come back tomorrow.
         logger.info("Agent unavailable for %s, falling back to the script", user_id[:8])
 
-    return _clip(prefix + await _scripted_reply(user_id, text, language))
+    return _clip(await _scripted_reply(user_id, text, language)) + footer
 
 
 # Bookkeeping that belongs to this module, not to the model. Sending it would
@@ -211,14 +240,22 @@ async def _agent_reply(user_id: str, text: str, language: str | None) -> str:
     history = list(_HISTORY[user_id])
     result = await agent_respond(
         text, history=history, context=_agent_context(user_id), language=language,
+        channel="whatsapp",
     )
     if not result.used_model:
         return ""
 
+    # The cards are a FALLBACK, not a companion to the prose.
+    #
+    # On the website the model writes the judgement and the cards carry the
+    # facts, so both belong. On WhatsApp there are no cards — the model has
+    # been told to write the schemes into its own message — so appending them
+    # printed the same four schemes twice in one bubble, once in the model's
+    # sentences and once as a bulleted list underneath. Whichever the reader
+    # believed, the other one made them doubt it.
     body = to_whatsapp_markup(result.text or "")
-    cards = render_cards(result.cards)
-    message = "\n\n".join(part for part in (body, cards) if part).strip()
-    if not message:
+    message = body or render_cards(result.cards)
+    if not message.strip():
         return ""
 
     _HISTORY[user_id].append({"role": "user", "text": text})

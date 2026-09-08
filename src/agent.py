@@ -137,7 +137,17 @@ HOW YOU SPEAK
   the honest word is "likely", never "you will get it".
 - Money is life-changing here and fraud is common. If someone mentions paying a
   fee or an agent to get a government loan, tell them plainly that no fee is
-  required.
+  required."""
+
+
+# The two channels show a tool's results in completely different ways, and the
+# difference is not cosmetic: on the website the schemes are already on screen
+# as cards, and on WhatsApp there is no screen at all — the message IS the
+# entire interface. A single prompt cannot serve both, and when the web version
+# was sent to WhatsApp the model wrote "the schemes are showing above on the
+# screen" to someone holding a phone with nothing above.
+
+SHAPE_WEB = """
 
 SHAPE OF AN ANSWER
 
@@ -165,6 +175,46 @@ and short `-` lists for steps. Do not build tables or headings; this is read on
 a phone."""
 
 
+SHAPE_WHATSAPP = """
+
+SHAPE OF A WHATSAPP MESSAGE
+
+There are no cards here and no screen to point at. Your message is the whole
+interface, on a small phone, often on a slow connection. Never say "above",
+"on the screen", "below" or "the list" — there is nothing there but your words.
+
+LENGTH IS THE WHOLE BATTLE. WhatsApp folds anything long behind a "Read more"
+link, and a folded answer is an unread answer. Keep the entire message under
+about six short lines. If you cannot say it in six lines, you are answering a
+question they have not asked yet.
+
+ONE THING PER MESSAGE. Either you ask a question, or you give an answer. Never
+both. Asking "which state do you live in?" and then listing schemes anyway
+tells the person their answer does not matter.
+
+WHEN YOU DO NOT KNOW ENOUGH YET
+A greeting like "hello, I am a poor SC woman" is not enough to recommend
+anything — half of what decides a scheme is the state they live in. So reply
+with a short greeting and ONE question, and nothing else. No list. No counts.
+No "521 schemes match". Ask, and wait.
+
+WHEN YOU DO HAVE ENOUGH
+- Open with one line saying what you found.
+- Then at most THREE schemes, one line each: the name, then three or four
+  words on what it gives. Nothing more.
+- Then one line: which to try first, and why.
+- Then one short question inviting the next step.
+
+FORMAT
+- Emoji as signposts, at most one per line, always at the start: 🙏 greeting,
+  ✅ good news, 📋 a scheme, 💰 money, 🏠 state or place, ⚠️ a warning,
+  📄 documents, 👉 next step. Never decorative, never mid-sentence.
+- Number choices 1️⃣ 2️⃣ 3️⃣ so they can reply with a digit — many people here
+  dictate rather than type, and a digit is the easiest possible reply.
+- **bold** only for a scheme name. No headings, no tables, no long dashes.
+- A blank line between each idea. Dense text is unreadable on a phone."""
+
+
 
 # Appended when the interface has a chosen language. Deliberately emphatic:
 # every model tested replies in the script it was written to unless told
@@ -185,6 +235,22 @@ Two things stay exactly as the tools returned them: the names of schemes,
 offices and government programmes, which are published in a fixed form and have
 to be recognisable at a counter, and rupee figures, which are already
 formatted."""
+
+SCHEME_FOCUS = """
+
+THE SCHEME THEY ARE READING: {name}  (slug: {slug})
+
+They opened this conversation from that scheme's page, so it is almost
+certainly what they are asking about even when they do not name it. "Am I
+eligible?", "what papers do I need?", "how much do I get?" all mean THIS one.
+
+Look it up rather than answering from the name — call `lookup_scheme` with the
+slug for what it says, and `check_scheme_eligibility` with the slug for whether
+they qualify. Never describe a scheme you have not read.
+
+If they clearly ask about something else, follow them; do not drag every
+question back to this scheme."""
+
 
 @dataclass
 class ToolCall:
@@ -673,6 +739,7 @@ async def stream(
     history: Optional[list[dict]] = None,
     context: Optional[dict] = None,
     language: Optional[str] = None,
+    channel: str = "web",
 ) -> "AsyncIterator[dict]":
     """One turn, reported as it happens.
 
@@ -700,17 +767,31 @@ async def stream(
     )
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    system = SYSTEM_PROMPT
+    system = SYSTEM_PROMPT + (
+        SHAPE_WHATSAPP if channel == "whatsapp" else SHAPE_WEB
+    )
     if language and language in LANGUAGES:
         meta = LANGUAGES[language]
         system += LANGUAGE_RULE.format(name=meta["name"], native=meta["native"])
     if context:
-        known = {k: v for k, v in context.items() if v not in (None, "", [])}
+        # The scheme they are reading is not a fact ABOUT them, so it must not
+        # go into the "what you already know about this person" block — listed
+        # there it reads as though they told us their caste is a scheme slug.
+        focus_slug = context.get("scheme") or ""
+        focus_name = context.get("scheme_name") or ""
+
+        known = {
+            k: v for k, v in context.items()
+            if k not in ("scheme", "scheme_name") and v not in (None, "", [])
+        }
         if known:
             system += (
                 "\n\nWhat you already know about this person, from what they "
                 f"filled in earlier — use it, do not ask again: {json.dumps(known)}"
             )
+        if focus_slug:
+            system += SCHEME_FOCUS.format(name=focus_name or focus_slug,
+                                          slug=focus_slug)
 
     messages: list[Any] = [SystemMessage(content=system)]
     for turn in history or []:
@@ -853,11 +934,12 @@ async def respond(
     history: Optional[list[dict]] = None,
     context: Optional[dict] = None,
     language: Optional[str] = None,
+    channel: str = "web",
 ) -> AgentReply:
     """The whole turn at once, for callers that cannot stream — WhatsApp, and
     anything that just wants the answer."""
     reply = AgentReply(used_model=True)
-    async for event in stream(message, history, context, language):
+    async for event in stream(message, history, context, language, channel):
         kind = event.get("type")
         if kind == "tool":
             reply.cards.extend(event.get("cards") or [])
